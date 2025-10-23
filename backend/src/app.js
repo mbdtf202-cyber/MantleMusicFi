@@ -11,6 +11,7 @@ const musicRoutes = require('./routes/music');
 const contractRoutes = require('./routes/contract');
 const userRoutes = require('./routes/user');
 const analyticsRoutes = require('./routes/analytics');
+const marketRoutes = require('./routes/market');
 
 const { errorHandler } = require('./middleware/errorHandler');
 const { connectDB } = require('../config/database');
@@ -58,6 +59,7 @@ app.use('/api/music', musicRoutes);
 app.use('/api/contract', contractRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/market', marketRoutes);
 app.use('/api/artist', require('./routes/artist'));
 app.use('/api/defi', require('./routes/defi'));
 app.use('/api/oracle', require('./routes/oracle'));

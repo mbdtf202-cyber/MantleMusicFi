@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title OracleManager
@@ -104,9 +104,9 @@ contract OracleManager is Ownable, ReentrancyGuard, Pausable {
         _;
     }
     
-    constructor() {
+    constructor(address initialOwner) Ownable(initialOwner) {
         // 初始化时添加合约部署者作为第一个Oracle
-        _addOracle(msg.sender, "Default Oracle");
+        _addOracle(initialOwner, "Default Oracle");
     }
     
     /**
@@ -175,7 +175,7 @@ contract OracleManager is Ownable, ReentrancyGuard, Pausable {
         string memory symbol,
         uint256 price,
         uint256 confidence
-    ) external onlyOracle whenNotPaused {
+    ) public onlyOracle whenNotPaused {
         require(bytes(symbol).length > 0, "OracleManager: symbol cannot be empty");
         require(price > 0, "OracleManager: price must be greater than 0");
         require(confidence >= MIN_CONFIDENCE && confidence <= 10000, "OracleManager: invalid confidence");

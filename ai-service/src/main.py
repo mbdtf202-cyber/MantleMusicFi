@@ -18,7 +18,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 # 导入API路由
-from src.api import revenue_prediction, credit_scoring, risk_assessment
+from src.api import revenue_prediction, credit_scoring, risk_assessment, recommendations, music_analysis
 
 # 简化的配置
 class SimpleSettings:
@@ -52,12 +52,19 @@ async def lifespan(app: FastAPI):
     try:
         # 初始化AI模型
         logger.info("📊 Loading AI models...")
+        
+        # 初始化模型管理器
+        global model_manager
+        from src.services.model_manager import ModelManager
+        model_manager = ModelManager()
+        await model_manager.initialize()
+        
+        # 将模型管理器存储到应用状态中
+        app.state.model_manager = model_manager
+        
         logger.info("  - Revenue Prediction Model loaded")
         logger.info("  - Credit Scoring Model loaded")
         logger.info("  - Risk Assessment Model loaded")
-        
-        # 简化的初始化
-        global model_manager
         logger.info("✅ AI服务初始化完成")
         
         yield
@@ -68,6 +75,8 @@ async def lifespan(app: FastAPI):
     finally:
         # 关闭时清理
         logger.info("🛑 正在关闭AI服务...")
+        if model_manager:
+            await model_manager.cleanup()
         logger.info("✅ AI服务已关闭")
 
 # 创建FastAPI应用
@@ -81,9 +90,11 @@ app = FastAPI(
 )
 
 # 注册API路由
-app.include_router(revenue_prediction.router, prefix="/api/v1")
-app.include_router(credit_scoring.router, prefix="/api/v1")
-app.include_router(risk_assessment.router, prefix="/api/v1")
+app.include_router(revenue_prediction.router, prefix="/api/v1", tags=["revenue"])
+app.include_router(credit_scoring.router, prefix="/api/v1", tags=["credit"])
+app.include_router(risk_assessment.router, prefix="/api/v1", tags=["risk"])
+app.include_router(recommendations.router, prefix="/api/v1", tags=["recommendations"])
+app.include_router(music_analysis.router, prefix="/api/v1", tags=["music-analysis"])
 
 # 中间件配置
 app.add_middleware(

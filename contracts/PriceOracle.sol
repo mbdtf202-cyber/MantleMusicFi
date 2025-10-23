@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /**
  * @title PriceOracle
  * @dev 价格预言机合约，提供音乐资产和代币的实时价格数据
  */
 contract PriceOracle is Ownable, ReentrancyGuard {
-    using SafeMath for uint256;
 
     // 价格数据结构
     struct PriceData {
@@ -93,7 +90,7 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         _;
     }
 
-    constructor() {}
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     /**
      * @dev 授权预言机
@@ -167,7 +164,7 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         string memory symbol,
         uint256 price,
         uint256 confidence
-    ) external onlyAuthorizedOracle validSymbol(symbol) {
+    ) public onlyAuthorizedOracle validSymbol(symbol) {
         require(price > 0, "Invalid price");
         require(confidence <= 100, "Invalid confidence");
 
@@ -240,15 +237,15 @@ contract PriceOracle is Ownable, ReentrancyGuard {
             DataSource memory source = dataSources[oracle];
 
             // 检查数据有效性
-            if (
-                data.isActive &&
-                source.isActive &&
-                block.timestamp.sub(data.timestamp) <= MAX_PRICE_AGE &&
-                data.confidence >= 50  // 最小置信度
-            ) {
-                uint256 weight = source.weight.mul(data.confidence).div(100);
-                weightedSum = weightedSum.add(data.price.mul(weight));
-                totalWeight = totalWeight.add(weight);
+        if (
+            data.isActive &&
+            source.isActive &&
+            block.timestamp - data.timestamp <= MAX_PRICE_AGE &&
+            data.confidence >= 50  // 最小置信度
+        ) {
+            uint256 weight = source.weight * data.confidence / 100;
+            weightedSum = weightedSum + data.price * weight;
+            totalWeight = totalWeight + weight;
                 validPrices[validSources] = data.price;
                 validSources++;
             }
@@ -257,7 +254,7 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         require(validSources >= MIN_SOURCES, "Insufficient valid sources");
 
         // 计算聚合价格
-        uint256 aggregatedPrice = weightedSum.div(totalWeight);
+        uint256 aggregatedPrice = weightedSum / totalWeight;
 
         // 计算价格偏差
         uint256 deviation = _calculateDeviation(validPrices, validSources, aggregatedPrice);
@@ -294,15 +291,15 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         uint256 sumSquaredDiff = 0;
         for (uint256 i = 0; i < count; i++) {
             uint256 diff = prices[i] > average ? 
-                prices[i].sub(average) : average.sub(prices[i]);
-            sumSquaredDiff = sumSquaredDiff.add(diff.mul(diff));
+                prices[i] - average : average - prices[i];
+            sumSquaredDiff = sumSquaredDiff + diff * diff;
         }
 
-        uint256 variance = sumSquaredDiff.div(count);
+        uint256 variance = sumSquaredDiff / count;
         uint256 stdDev = _sqrt(variance);
         
         // 返回相对标准差（基点）
-        return stdDev.mul(10000).div(average);
+        return stdDev * 10000 / average;
     }
 
     /**
@@ -310,11 +307,11 @@ contract PriceOracle is Ownable, ReentrancyGuard {
      */
     function _sqrt(uint256 x) internal pure returns (uint256) {
         if (x == 0) return 0;
-        uint256 z = x.add(1).div(2);
+        uint256 z = (x + 1) / 2;
         uint256 y = x;
         while (z < y) {
             y = z;
-            z = x.div(z).add(z).div(2);
+            z = (x / z + z) / 2;
         }
         return y;
     }
@@ -331,11 +328,11 @@ contract PriceOracle is Ownable, ReentrancyGuard {
         AggregatedPrice memory aggPrice = aggregatedPrices[symbol];
         require(aggPrice.timestamp > 0, "Price not available");
         require(
-            block.timestamp.sub(aggPrice.timestamp) <= MAX_PRICE_AGE,
+            block.timestamp - aggPrice.timestamp <= MAX_PRICE_AGE,
             "Price too old"
         );
 
-        return (aggPrice.price, aggPrice.timestamp, 100 - aggPrice.deviation.div(100));
+        return (aggPrice.price, aggPrice.timestamp, 100 - aggPrice.deviation / 100);
     }
 
     /**
@@ -419,7 +416,7 @@ contract PriceOracle is Ownable, ReentrancyGuard {
     function isPriceAvailable(string memory symbol) external view returns (bool) {
         AggregatedPrice memory aggPrice = aggregatedPrices[symbol];
         return aggPrice.timestamp > 0 && 
-               block.timestamp.sub(aggPrice.timestamp) <= MAX_PRICE_AGE;
+               block.timestamp - aggPrice.timestamp <= MAX_PRICE_AGE;
     }
 
     /**

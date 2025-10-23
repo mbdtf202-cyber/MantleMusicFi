@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Music, TrendingUp, Shield, Zap, Users, Globe, Hexagon, Layers, Network } from 'lucide-react';
+import { ArrowRight, Music, TrendingUp, Shield, Zap, Users, Globe, Hexagon, Layers, Network, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
@@ -56,6 +56,14 @@ const HomePage: React.FC = () => {
       href: '/analytics',
       color: 'from-blue-500 to-mantle-accent',
       gradient: 'bg-gradient-to-br from-blue-500/20 to-[#FF6B35]/20',
+    },
+    {
+      icon: Sparkles,
+      title: 'AI Recommendations',
+      description: 'Personalized music recommendations powered by AI',
+      href: '/recommendations',
+      color: 'from-pink-500 to-mantle-primary',
+      gradient: 'bg-gradient-to-br from-pink-500/20 to-[#00D4AA]/20',
     },
   ];
 

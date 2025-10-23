@@ -28,7 +28,15 @@ import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import PortfolioOverview from '@/components/portfolio/PortfolioOverview';
 import AdvancedChart from '@/components/charts/AdvancedChart';
+import DashboardService, { 
+  Investment as ApiInvestment, 
+  MarketSong as ApiMarketSong, 
+  DeFiMetrics as ApiDeFiMetrics,
+  PortfolioStats,
+  MarketFilter
+} from '@/services/dashboardService';
 
+// 本地接口定义（兼容现有代码）
 interface Investment {
   id: string;
   trackTitle: string;
@@ -61,15 +69,35 @@ interface DeFiMetrics {
   governanceTokens: number;
 }
 
+interface MarketTrack {
+  id: string;
+  title: string;
+  artist: string;
+  price: number;
+  change24h: number;
+  volume24h: number;
+  marketCap: number;
+  rating: number;
+}
+
 const InvestorDashboard: React.FC = () => {
+  // 默认用户ID，实际应用中应从认证系统获取
+  const userId = 'user123';
+  
   const [activeTab, setActiveTab] = useState<'portfolio' | 'market' | 'analytics' | 'defi'>('portfolio');
   const [searchTerm, setSearchTerm] = useState('');
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [marketSongs, setMarketSongs] = useState<MarketSong[]>([]);
   const [portfolioData, setPortfolioData] = useState<any[]>([]);
   const [defiMetrics, setDefiMetrics] = useState<DeFiMetrics | null>(null);
+  const [portfolioStats, setPortfolioStats] = useState<PortfolioStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [operationLoading, setOperationLoading] = useState(false);
   const [hideBalances, setHideBalances] = useState(false);
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -77,105 +105,108 @@ const InvestorDashboard: React.FC = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Simulate API calls with more realistic data
-      setTimeout(() => {
-        setInvestments([
-          {
-            id: '1',
-            trackTitle: 'Midnight Dreams',
-            artist: 'Luna Echo',
-            mrtTokens: 300,
-            investmentAmount: 1.5,
-            currentValue: 2.1,
-            dailyReturn: 0.05,
-            totalReturn: 0.6,
-            returnPercentage: 40,
-            status: 'active'
-          },
-          {
-            id: '2',
-            trackTitle: 'Ocean Waves',
-            artist: 'Aqua Sound',
-            mrtTokens: 160,
-            investmentAmount: 0.8,
-            currentValue: 0.95,
-            dailyReturn: 0.02,
-            totalReturn: 0.15,
-            returnPercentage: 18.75,
-            status: 'active'
-          },
-          {
-            id: '3',
-            trackTitle: 'City Lights',
-            artist: 'Urban Pulse',
-            mrtTokens: 400,
-            investmentAmount: 2.0,
-            currentValue: 1.7,
-            dailyReturn: -0.03,
-            totalReturn: -0.3,
-            returnPercentage: -15,
-            status: 'active'
-          }
-        ]);
+      setLoading(true);
 
-        setMarketSongs([
-          {
-            id: '1',
-            title: 'Stellar Journey',
-            artist: 'Cosmic Beats',
-            price: 0.45,
-            change24h: 12.5,
-            volume: 15.2,
-            marketCap: 125.8,
-            genre: 'Electronic',
-            trending: true
-          },
-          {
-            id: '2',
-            title: 'Forest Whispers',
-            artist: 'Nature Sounds',
-            price: 0.32,
-            change24h: -5.2,
-            volume: 8.7,
-            marketCap: 89.3,
-            genre: 'Ambient'
-          },
-          {
-            id: '3',
-            title: 'Neon Nights',
-            artist: 'Synth Wave',
-            price: 0.78,
-            change24h: 8.9,
-            volume: 22.1,
-            marketCap: 198.5,
-            genre: 'Synthwave',
-            trending: true
-          }
-        ]);
+      // 并行获取所有数据
+      const [dashboardData, portfolioHistory] = await Promise.all([
+        DashboardService.getDashboardData(userId),
+        DashboardService.getPortfolioHistory(userId, '30d')
+      ]);
 
-        setPortfolioData([
-          { x: 'Jan', y: 4.2 },
-          { x: 'Feb', y: 4.8 },
-          { x: 'Mar', y: 4.1 },
-          { x: 'Apr', y: 5.2 },
-          { x: 'May', y: 4.9 },
-          { x: 'Jun', y: 5.8 }
-        ]);
+      // 更新状态
+      setInvestments(dashboardData.investments);
+      setMarketSongs(dashboardData.marketSongs);
+      setPortfolioStats(dashboardData.portfolioStats);
+      setDefiMetrics(dashboardData.defiMetrics);
+      setPortfolioData(portfolioHistory);
 
-        setDefiMetrics({
-          totalValueLocked: 2.4,
-          stakingRewards: 0.15,
-          liquidityPools: 1.8,
-          governanceTokens: 450
-        });
-
-        setLoading(false);
-      }, 1000);
+      setNotification({
+        type: 'success',
+        message: 'Dashboard data updated successfully'
+      });
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
+      setNotification({
+        type: 'error',
+        message: 'Failed to load dashboard data. Please try again.'
+      });
+    } finally {
       setLoading(false);
     }
   };
+
+  // 投资音乐资产
+  const handleInvestInTrack = async (trackId: string, amount: number) => {
+    try {
+      setOperationLoading(true);
+      const result = await DashboardService.investInTrack(trackId, amount);
+      
+      if (result.success) {
+        setNotification({
+          type: 'success',
+          message: `Successfully invested ${amount} ETH in track`
+        });
+        // 重新加载数据
+        await fetchDashboardData();
+      } else {
+        setNotification({
+          type: 'error',
+          message: result.error || 'Investment failed'
+        });
+      }
+    } catch (error) {
+      console.error('Investment error:', error);
+      setNotification({
+        type: 'error',
+        message: 'Investment failed. Please try again.'
+      });
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // 出售投资
+  const handleSellInvestment = async (investmentId: string, amount: number) => {
+    try {
+      setOperationLoading(true);
+      const result = await DashboardService.sellInvestment(investmentId, amount);
+      
+      if (result.success) {
+        setNotification({
+          type: 'success',
+          message: `Successfully sold ${amount} ETH worth of investment`
+        });
+        // 重新加载数据
+        await fetchDashboardData();
+      } else {
+        setNotification({
+          type: 'error',
+          message: result.error || 'Sale failed'
+        });
+      }
+    } catch (error) {
+      console.error('Sale error:', error);
+      setNotification({
+        type: 'error',
+        message: 'Sale failed. Please try again.'
+      });
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
+  // 清除通知
+  const clearNotification = () => {
+    setNotification(null);
+  };
+
+  // 自动清除通知
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(clearNotification, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const mockInvestments: Investment[] = [
     {
@@ -249,44 +280,90 @@ const InvestorDashboard: React.FC = () => {
     }
   ];
 
-  const portfolioStats = [
-    { 
-      label: 'Total Investment Value', 
-      value: '$8,845', 
-      change: '+$345', 
-      changePercent: '+4.1%',
-      icon: DollarSign, 
-      color: 'from-green-500 to-green-600',
-      isPositive: true
-    },
-    { 
-      label: 'Daily Return', 
-      value: '+$22', 
-      change: '+0.25%', 
-      changePercent: '',
-      icon: TrendingUp, 
-      color: 'from-blue-500 to-blue-600',
-      isPositive: true
-    },
-    { 
-      label: 'MRT Holdings', 
-      value: '1,550', 
-      change: '+50', 
-      changePercent: '+3.3%',
-      icon: PieChart, 
-      color: 'from-purple-500 to-purple-600',
-      isPositive: true
-    },
-    { 
-      label: 'Portfolio Count', 
-      value: '12', 
-      change: '+2', 
-      changePercent: '',
-      icon: BarChart3, 
-      color: 'from-orange-500 to-orange-600',
-      isPositive: true
-    },
-  ];
+  const getPortfolioStatsDisplay = () => {
+    if (!portfolioStats) {
+      return [
+        { 
+          label: 'Total Investment Value', 
+          value: '0.00 ETH', 
+          change: '+0.00 ETH', 
+          changePercent: '+0.0%',
+          icon: DollarSign, 
+          color: 'from-green-500 to-green-600',
+          isPositive: true
+        },
+        { 
+          label: 'Daily Return', 
+          value: '+0.00 ETH', 
+          change: '+0.0%', 
+          changePercent: '',
+          icon: TrendingUp, 
+          color: 'from-blue-500 to-blue-600',
+          isPositive: true
+        },
+        { 
+          label: 'MRT Holdings', 
+          value: '0', 
+          change: '+0', 
+          changePercent: '+0.0%',
+          icon: PieChart, 
+          color: 'from-purple-500 to-purple-600',
+          isPositive: true
+        },
+        { 
+          label: 'Portfolio Count', 
+          value: '0', 
+          change: '+0', 
+          changePercent: '',
+          icon: BarChart3, 
+          color: 'from-orange-500 to-orange-600',
+          isPositive: true
+        },
+      ];
+    }
+
+    const dailyReturnIsPositive = portfolioStats.dailyReturn >= 0;
+    const totalReturnIsPositive = portfolioStats.totalReturn >= 0;
+
+    return [
+      { 
+        label: 'Total Investment Value', 
+        value: formatCurrency(portfolioStats.currentValue), 
+        change: `${totalReturnIsPositive ? '+' : ''}${formatCurrency(portfolioStats.totalReturn)}`, 
+        changePercent: `${totalReturnIsPositive ? '+' : ''}${portfolioStats.returnPercentage.toFixed(1)}%`,
+        icon: DollarSign, 
+        color: 'from-green-500 to-green-600',
+        isPositive: totalReturnIsPositive
+      },
+      { 
+        label: 'Daily Return', 
+        value: `${dailyReturnIsPositive ? '+' : ''}${formatCurrency(portfolioStats.dailyReturn)}`, 
+        change: `${dailyReturnIsPositive ? '+' : ''}${(portfolioStats.dailyReturn / portfolioStats.currentValue * 100).toFixed(2)}%`, 
+        changePercent: '',
+        icon: dailyReturnIsPositive ? TrendingUp : TrendingDown, 
+        color: dailyReturnIsPositive ? 'from-blue-500 to-blue-600' : 'from-red-500 to-red-600',
+        isPositive: dailyReturnIsPositive
+      },
+      { 
+        label: 'MRT Holdings', 
+        value: portfolioStats.mrtHoldings.toLocaleString(), 
+        change: '+0', 
+        changePercent: '',
+        icon: PieChart, 
+        color: 'from-purple-500 to-purple-600',
+        isPositive: true
+      },
+      { 
+        label: 'Portfolio Count', 
+        value: portfolioStats.portfolioCount.toString(), 
+        change: '', 
+        changePercent: '',
+        icon: BarChart3, 
+        color: 'from-orange-500 to-orange-600',
+        isPositive: true
+      },
+    ];
+  };
 
   const totalInvested = investments.reduce((sum, inv) => sum + inv.investmentAmount, 0);
   const totalValue = investments.reduce((sum, inv) => sum + inv.currentValue, 0);
@@ -374,7 +451,7 @@ const InvestorDashboard: React.FC = () => {
           className="mb-8"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {portfolioStats.map((stat, index) => (
+            {getPortfolioStatsDisplay().map((stat, index) => (
               <motion.div
                 key={stat.label}
                 initial={{ opacity: 0, y: 20 }}
@@ -432,7 +509,7 @@ const InvestorDashboard: React.FC = () => {
 
         {/* Portfolio Tab */}
         {activeTab === 'portfolio' && (
-          <PortfolioOverview userId="user123" />
+          <PortfolioOverview userId={userId} />
 
         )}
 
@@ -543,8 +620,13 @@ const InvestorDashboard: React.FC = () => {
                           {formatCurrency(song.marketCap)}
                         </td>
                         <td className="text-right py-4 px-4">
-                          <Button variant="primary" size="sm">
-                            Invest
+                          <Button 
+                            variant="primary" 
+                            size="sm"
+                            onClick={() => handleInvestInTrack(song.id, 0.1)}
+                            disabled={operationLoading}
+                          >
+                            {operationLoading ? 'Investing...' : 'Invest'}
                           </Button>
                         </td>
                       </motion.tr>
@@ -745,6 +827,32 @@ const InvestorDashboard: React.FC = () => {
               </div>
             </Card>
           </div>
+        )}
+
+        {/* Notification */}
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.9 }}
+            className="fixed bottom-4 right-4 z-50"
+          >
+            <div className={`p-4 rounded-lg shadow-lg max-w-sm ${
+              notification.type === 'success' 
+                ? 'bg-green-500/90 text-white' 
+                : 'bg-red-500/90 text-white'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{notification.message}</span>
+                <button
+                  onClick={clearNotification}
+                  className="ml-3 text-white hover:text-gray-200"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </motion.div>
         )}
       </div>
     </div>

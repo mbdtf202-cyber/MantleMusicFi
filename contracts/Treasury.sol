@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -99,7 +99,7 @@ contract Treasury is Ownable, ReentrancyGuard, Pausable {
     
     event FeeRateUpdated(uint256 oldRate, uint256 newRate);
     
-    constructor(address _mrtToken) {
+    constructor(address _mrtToken, address initialOwner) Ownable(initialOwner) {
         require(_mrtToken != address(0), "Treasury: MRT token cannot be zero address");
         mrtToken = IERC20(_mrtToken);
         _distributionIdCounter = 1;

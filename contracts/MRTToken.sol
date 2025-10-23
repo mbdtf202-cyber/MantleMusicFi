@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title MRTToken
@@ -65,7 +66,7 @@ contract MRTToken is ERC20, ERC20Burnable, Ownable, Pausable, ReentrancyGuard {
     event TokenActivated(uint256 indexed tokenId);
     event TokenDeactivated(uint256 indexed tokenId);
     
-    constructor() ERC20("Music Royalty Token", "MRT") {
+    constructor(address initialOwner) ERC20("Music Royalty Token", "MRT") Ownable(initialOwner) {
         _tokenIdCounter = 1;
     }
     
@@ -83,7 +84,7 @@ contract MRTToken is ERC20, ERC20Burnable, Ownable, Pausable, ReentrancyGuard {
         string memory musicTitle,
         string memory ipfsHash,
         uint256 royaltyPercentage
-    ) external onlyOwner nonReentrant returns (uint256) {
+    ) public onlyOwner nonReentrant returns (uint256) {
         require(artist != address(0), "MRT: artist cannot be zero address");
         require(amount >= MIN_MINT_AMOUNT && amount <= MAX_MINT_AMOUNT, "MRT: invalid mint amount");
         require(bytes(musicTitle).length > 0, "MRT: music title cannot be empty");

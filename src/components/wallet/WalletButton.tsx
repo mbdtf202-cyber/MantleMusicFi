@@ -88,6 +88,11 @@ const WalletButton: React.FC = () => {
                             alt={chain.name ?? 'Chain icon'}
                             src={chain.iconUrl}
                             style={{ width: 16, height: 16 }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                            }}
+                            loading="lazy"
                           />
                         )}
                       </div>

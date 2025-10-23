@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, query, validationResult } = require('express-validator');
+const axios = require('axios');
 const Music = require('../models/Music');
 const User = require('../models/User');
 const { auth, optionalAuth, authorize } = require('../middleware/auth');
@@ -92,6 +93,116 @@ router.get('/', [
       }
     }
   });
+}));
+
+// 获取音乐推荐
+router.get('/recommendations', [
+  query('user_id').optional().isString().withMessage('User ID must be a string'),
+  query('limit').optional().isInt({ min: 1, max: 50 }).withMessage('Limit must be between 1 and 50'),
+  query('genre').optional().isString().withMessage('Genre must be a string'),
+  query('recommendation_type').optional().isIn(['collaborative', 'content_based', 'hybrid']).withMessage('Invalid recommendation type')
+], optionalAuth, asyncHandler(async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errors.array()
+    });
+  }
+
+  const {
+    user_id = req.user?._id?.toString() || 'default_user',
+    limit = 10,
+    genre,
+    recommendation_type = 'hybrid'
+  } = req.query;
+
+  try {
+    // 构建用户偏好数据
+    const userPreferences = {
+      user_id: user_id,
+      favorite_genres: genre ? [genre] : ['Pop', 'Rock'],
+      favorite_artists: [],
+      listening_history: [],
+      mood_preference: null,
+      activity_context: null
+    };
+    
+    const requestData = {
+      user_preferences: userPreferences,
+      recommendation_type: recommendation_type,
+      limit: parseInt(limit),
+      exclude_listened: true
+    };
+    
+    // 调用 AI 服务获取推荐
+    const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000';
+    const response = await axios.post(`${aiServiceUrl}/api/v1/personalized`, requestData, {
+      timeout: 10000,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.data.success) {
+      res.json({
+        success: true,
+        data: {
+          recommendations: response.data.data.recommendations || [],
+          total: response.data.data.total_count || 0,
+          recommendation_type: response.data.data.recommendation_type || recommendation_type
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get recommendations from AI service'
+      });
+    }
+  } catch (error) {
+    console.error('Error calling AI service for recommendations:', error.message);
+    
+    // 如果 AI 服务不可用，返回基于数据库的简单推荐
+    try {
+      const fallbackRecommendations = await Music.find({ 
+        status: 'published',
+        ...(genre && { genre })
+      })
+        .populate('artist', 'username profile.firstName profile.lastName profile.avatar')
+        .sort({ 'stats.playCount': -1, 'stats.likeCount': -1 })
+        .limit(parseInt(limit))
+        .select('title artist genre stats publishedAt description')
+        .lean();
+
+      res.json({
+        success: true,
+        data: {
+          recommendations: fallbackRecommendations.map(music => ({
+            music_id: music._id,
+            title: music.title,
+            artist: music.artist?.username || 'Unknown Artist',
+            genre: music.genre,
+            similarity_score: 0.8,
+            reason: 'Popular track in your preferred genre',
+            metadata: {
+              playCount: music.stats?.playCount || 0,
+              likeCount: music.stats?.likeCount || 0,
+              publishedAt: music.publishedAt
+            }
+          })),
+          total: fallbackRecommendations.length,
+          source: 'fallback'
+        }
+      });
+    } catch (fallbackError) {
+      console.error('Error in fallback recommendations:', fallbackError.message);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get recommendations'
+      });
+    }
+  }
 }));
 
 // 获取单个音乐详情

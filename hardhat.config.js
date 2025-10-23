@@ -1,14 +1,17 @@
+require("dotenv").config();
 require("@nomicfoundation/hardhat-toolbox");
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
-    version: "0.8.19",
+    version: "0.8.26",
     settings: {
       optimizer: {
         enabled: true,
         runs: 200,
       },
+      evmVersion: "cancun", // Enable Cancun EVM version for mcopy support
+      viaIR: true
     },
   },
   networks: {
@@ -20,14 +23,25 @@ module.exports = {
       chainId: 31337,
     },
     mantleTestnet: {
-      url: "https://rpc.testnet.mantle.xyz",
-      chainId: 5001,
+      url: "https://rpc.sepolia.mantle.xyz",
+      chainId: 5003,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      timeout: 60000,
+      gasPrice: "auto",
     },
     mantle: {
       url: "https://rpc.mantle.xyz",
       chainId: 5000,
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      timeout: 60000,
+      gasPrice: "auto",
+    },
+    sepolia: {
+      url: "https://ethereum-sepolia-rpc.publicnode.com",
+      chainId: 11155111,
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      timeout: 60000,
+      gasPrice: "auto",
     },
   },
   gasReporter: {

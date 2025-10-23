@@ -19,7 +19,15 @@ import {
   User,
   MessageSquare
 } from 'lucide-react';
+import GovernanceService, { 
+  Proposal as ApiProposal, 
+  GovernanceStats as ApiGovernanceStats, 
+  UserVotingData as ApiUserVotingData,
+  CreateProposalData,
+  VoteData
+} from '@/services/governanceService';
 
+// 本地接口定义（兼容现有代码）
 interface Proposal {
   id: number;
   title: string;
@@ -58,88 +66,129 @@ const GovernancePage = () => {
   const [governanceStats, setGovernanceStats] = useState<GovernanceStats | null>(null);
   const [userVotingData, setUserVotingData] = useState<UserVotingData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [operationLoading, setOperationLoading] = useState(false);
   const [createProposalData, setCreateProposalData] = useState({
     title: '',
     description: '',
     category: '',
     type: 'general'
   });
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // 显示通知
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  // 转换API数据格式
+  const convertApiProposal = (apiProposal: ApiProposal): Proposal => ({
+    id: parseInt(apiProposal.id),
+    title: apiProposal.title,
+    description: apiProposal.description,
+    proposer: apiProposal.proposer,
+    status: apiProposal.status === 'failed' ? 'rejected' : apiProposal.status,
+    votesFor: apiProposal.votesFor,
+    votesAgainst: apiProposal.votesAgainst,
+    totalVotes: apiProposal.totalVotes,
+    endTime: new Date(apiProposal.endTime).toLocaleDateString(),
+    category: apiProposal.category,
+    createdAt: apiProposal.startTime,
+    executedAt: apiProposal.executionTime
+  });
 
   // API调用函数
   const loadGovernanceData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
+      const [apiProposals, apiStats, apiUserData] = await Promise.all([
+        GovernanceService.getProposals(),
+        GovernanceService.getGovernanceStats(),
+        GovernanceService.getUserVotingData()
+      ]);
       
-      // 加载提案列表
-      const proposalsResponse = await fetch('/api/governance/proposals');
-      if (proposalsResponse.ok) {
-        const proposalsData = await proposalsResponse.json();
-        setProposals(proposalsData.proposals || mockProposals);
-      } else {
-        setProposals(mockProposals);
-      }
+      // 转换数据格式
+      const convertedProposals = apiProposals.map(convertApiProposal);
+      setProposals(convertedProposals);
       
-      // 加载治理统计
-      const statsResponse = await fetch('/api/governance/stats');
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setGovernanceStats(statsData);
-      } else {
-        setGovernanceStats(mockStats);
-      }
+      // 转换统计数据格式
+      setGovernanceStats({
+        totalProposals: apiStats.totalProposals,
+        activeProposals: apiStats.activeProposals,
+        totalVotes: parseInt(apiStats.totalVotingPower),
+        userVotingPower: parseInt(apiUserData.votingPower)
+      });
       
-      // 加载用户投票数据
-      const userResponse = await fetch('/api/governance/user/voting-power');
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
-        setUserVotingData(userData);
-      }
+      // 转换用户数据格式
+      setUserVotingData({
+        votingPower: parseInt(apiUserData.votingPower),
+        delegatedTo: apiUserData.delegatedTo || null,
+        delegatedFrom: apiUserData.delegatedFrom,
+        votingHistory: apiUserData.votingHistory
+      });
     } catch (error) {
-      console.error('Failed to load governance data:', error);
-      // 使用模拟数据作为后备
-      setProposals(mockProposals);
-      setGovernanceStats(mockStats);
+      console.error('Error loading governance data:', error);
+      showNotification('error', 'Failed to load governance data');
     } finally {
       setLoading(false);
     }
   };
 
   const createProposal = async () => {
+    if (!createProposalData.title || !createProposalData.description || !createProposalData.category) {
+      showNotification('error', 'Please fill in all required fields');
+      return;
+    }
+
+    setOperationLoading(true);
     try {
-      const response = await fetch('/api/governance/proposals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(createProposalData),
-      });
+      const proposalData: CreateProposalData = {
+        title: createProposalData.title,
+        description: createProposalData.description,
+        category: createProposalData.category,
+        actions: [] // 简化版本，不包含具体操作
+      };
+
+      const result = await GovernanceService.createProposal(proposalData);
       
-      if (response.ok) {
+      if (result.success) {
         setShowCreateModal(false);
         setCreateProposalData({ title: '', description: '', category: '', type: 'general' });
+        showNotification('success', result.message || 'Proposal created successfully');
         await loadGovernanceData(); // 重新加载数据
+      } else {
+        showNotification('error', result.message || 'Failed to create proposal');
       }
     } catch (error) {
       console.error('Failed to create proposal:', error);
+      showNotification('error', 'Failed to create proposal');
+    } finally {
+      setOperationLoading(false);
     }
   };
 
   const voteOnProposal = async (proposalId: number, support: boolean) => {
+    setOperationLoading(true);
     try {
-      const response = await fetch(`/api/governance/proposals/${proposalId}/vote`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ support }),
-      });
+      const voteData: VoteData = {
+        proposalId: proposalId.toString(),
+        support: support ? 'for' : 'against'
+      };
+
+      const result = await GovernanceService.vote(voteData);
       
-      if (response.ok) {
+      if (result.success) {
+        showNotification('success', result.message || 'Vote cast successfully');
         await loadGovernanceData(); // 重新加载数据
         setSelectedProposal(null);
+      } else {
+        showNotification('error', result.message || 'Failed to cast vote');
       }
     } catch (error) {
       console.error('Failed to vote on proposal:', error);
+      showNotification('error', 'Failed to cast vote');
+    } finally {
+      setOperationLoading(false);
     }
   };
 
@@ -254,6 +303,22 @@ const GovernancePage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
       <div className="cyber-grid opacity-20" />
+      
+      {/* Notification */}
+      {notification && (
+        <motion.div
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -50 }}
+          className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg ${
+            notification.type === 'success' 
+              ? 'bg-green-600 text-white' 
+              : 'bg-red-600 text-white'
+          }`}
+        >
+          {notification.message}
+        </motion.div>
+      )}
       
       <div className="relative z-10 container mx-auto px-4 py-8">
         <motion.div
@@ -596,9 +661,9 @@ const GovernancePage = () => {
             <Button 
               variant="primary" 
               onClick={createProposal}
-              disabled={!createProposalData.title || !createProposalData.description || !createProposalData.category}
+              disabled={!createProposalData.title || !createProposalData.description || !createProposalData.category || operationLoading}
             >
-              Submit Proposal
+              {operationLoading ? 'Creating...' : 'Submit Proposal'}
             </Button>
           </div>
         </div>
@@ -635,17 +700,19 @@ const GovernancePage = () => {
                   variant="primary" 
                   className="flex-1"
                   onClick={() => voteOnProposal(selectedProposal.id, true)}
+                  disabled={operationLoading}
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  Support
+                  {operationLoading ? 'Voting...' : 'Support'}
                 </Button>
                 <Button 
                   variant="outline" 
                   className="flex-1"
                   onClick={() => voteOnProposal(selectedProposal.id, false)}
+                  disabled={operationLoading}
                 >
                   <XCircle className="w-4 h-4 mr-2" />
-                  Against
+                  {operationLoading ? 'Voting...' : 'Against'}
                 </Button>
               </div>
             )}

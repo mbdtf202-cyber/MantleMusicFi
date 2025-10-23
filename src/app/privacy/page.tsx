@@ -6,6 +6,7 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
+import PrivacyService, { ZKVerification, SBTToken, ComplianceCheck, KYCSubmission } from '@/services/privacyService';
 import { 
   Shield, 
   CheckCircle, 
@@ -23,31 +24,6 @@ import {
   Copy,
   ExternalLink
 } from 'lucide-react';
-
-interface ZKVerification {
-  status: 'Unverified' | 'Pending' | 'Verified' | 'Rejected';
-  level: string | null;
-  expiryTime: number | null;
-  isValid: boolean;
-  verificationTime?: number;
-  verifier?: string;
-}
-
-interface SBTToken {
-  tokenId: number;
-  tokenType: string;
-  score: number;
-  isActive: boolean;
-  issuedTime: number;
-  expiryTime: number;
-  metadataURI: string;
-}
-
-interface ComplianceCheck {
-  compliant: boolean;
-  requirement: string;
-  failureReasons: string[];
-}
 
 const PrivacyPage = () => {
   const [showKYCModal, setShowKYCModal] = useState(false);
@@ -76,29 +52,17 @@ const PrivacyPage = () => {
     setLoading(true);
     try {
       // Load ZK verification status
-      const zkResponse = await fetch(`/api/privacy/zk-kyc/status/${userAddress}`);
-      const zkData = await zkResponse.json();
-      if (zkData.success) {
-        setZkVerification(zkData.data);
-      }
+      const zkData = await PrivacyService.getZKVerificationStatus(userAddress);
+      setZkVerification(zkData);
 
       // Load SBT tokens
-      const sbtResponse = await fetch(`/api/privacy/sbt/user/${userAddress}`);
-      const sbtData = await sbtResponse.json();
-      if (sbtData.success) {
-        setSbtTokens(sbtData.data.tokens);
-      }
+      const sbtTokens = await PrivacyService.getUserSBTTokens(userAddress);
+      setSbtTokens(sbtTokens);
 
       // Load compliance status for common requirements
-      const requirements = ['invest', 'accredited_invest'];
-      const compliancePromises = requirements.map(async (req) => {
-        const response = await fetch(`/api/privacy/compliance/check/${userAddress}?requirement=${req}`);
-        const data = await response.json();
-        return data.success ? data.data : null;
-      });
-      
-      const complianceResults = await Promise.all(compliancePromises);
-      setComplianceStatus(complianceResults.filter(Boolean));
+      const requirements = ['invest', 'accredited_invest', 'high_value_invest', 'institutional_invest'];
+      const complianceResults = await PrivacyService.getComplianceStatus(userAddress, requirements);
+      setComplianceStatus(complianceResults);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
@@ -114,24 +78,19 @@ const PrivacyPage = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('/api/privacy/zk-kyc/submit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          address: userAddress,
-          ...kycForm
-        }),
-      });
+      const submission: KYCSubmission = {
+        address: userAddress,
+        ...kycForm
+      };
 
-      const data = await response.json();
-      if (data.success) {
-        alert('ZK-KYC verification submitted successfully!');
+      const result = await PrivacyService.submitZKVerification(submission);
+      
+      if (result.success) {
+        alert(result.message);
         setShowKYCModal(false);
         loadUserData(); // Refresh data
       } else {
-        alert(data.message || 'Submission failed');
+        alert(result.message || 'Submission failed');
       }
     } catch (error) {
       console.error('KYC submission error:', error);

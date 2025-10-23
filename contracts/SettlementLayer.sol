@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -17,10 +16,14 @@ interface IPriceOracle {
 
 /**
  * @title SettlementLayer
- * @dev 自动结算层合约，处理音乐版税分配、交易结算和自动化支付
+ * @dev Handles cross-chain settlements and payment processing for MantleMusic
+ * Supports multiple payment methods and cross-chain transactions
  */
-contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
-    using SafeMath for uint256;
+contract SettlementLayer is 
+    Ownable, 
+    ReentrancyGuard, 
+    Pausable 
+{
     using SafeERC20 for IERC20;
 
     // 结算类型枚举
@@ -175,7 +178,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
         _;
     }
 
-    constructor(address _priceOracle) {
+    constructor(address _priceOracle, address initialOwner) Ownable(initialOwner) {
         priceOracle = IPriceOracle(_priceOracle);
         authorizedExecutors[msg.sender] = true;
     }
@@ -238,14 +241,14 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
         uint256 totalAmount = 0;
         for (uint256 i = 0; i < amounts.length; i++) {
             require(amounts[i] > 0, "Invalid amount");
-            totalAmount = totalAmount.add(amounts[i]);
+            totalAmount = totalAmount + amounts[i];
         }
 
         // 转移代币到合约
         if (token != address(0)) {
             IERC20(token).safeTransferFrom(msg.sender, address(this), totalAmount);
         } else {
-            require(msg.value >= totalAmount.add(executionFee), "Insufficient ETH");
+            require(msg.value >= totalAmount + executionFee, "Insufficient ETH");
         }
 
         taskId = nextTaskId++;
@@ -265,7 +268,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
             metadata: metadata,
             isRecurring: isRecurring,
             recurringInterval: recurringInterval,
-            nextExecution: isRecurring ? executionTime.add(recurringInterval) : 0
+            nextExecution: isRecurring ? executionTime + recurringInterval : 0
         });
 
         userTasks[msg.sender].push(taskId);
@@ -313,8 +316,11 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
                 }
             } else {
                 // ERC20转账
-                try IERC20(task.token).safeTransfer(recipient, amount) {
-                    // 转账成功
+                try IERC20(task.token).transfer(recipient, amount) returns (bool result) {
+                    if (!result) {
+                        success = false;
+                        break;
+                    }
                 } catch {
                     success = false;
                     break;
@@ -322,7 +328,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
             }
         }
 
-        uint256 gasUsed = gasStart.sub(gasleft());
+        uint256 gasUsed = gasStart - gasleft();
 
         if (success) {
             task.status = SettlementStatus.COMPLETED;
@@ -355,7 +361,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
         uint256 totalPercentage = 0;
         for (uint256 i = 0; i < percentages.length; i++) {
             require(percentages[i] > 0, "Invalid percentage");
-            totalPercentage = totalPercentage.add(percentages[i]);
+            totalPercentage = totalPercentage + percentages[i];
         }
         require(totalPercentage == 10000, "Percentages must sum to 100%");
 
@@ -386,7 +392,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
             IERC20(token).safeTransferFrom(msg.sender, address(this), revenue);
         }
 
-        distribution.totalRevenue = distribution.totalRevenue.add(revenue);
+        distribution.totalRevenue = distribution.totalRevenue + revenue;
 
         // 计算并分配给每个利益相关者
         address[] memory recipients = new address[](distribution.stakeholders.length);
@@ -394,7 +400,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
 
         for (uint256 i = 0; i < distribution.stakeholders.length; i++) {
             recipients[i] = distribution.stakeholders[i];
-            amounts[i] = revenue.mul(distribution.percentages[i]).div(10000);
+            amounts[i] = revenue * distribution.percentages[i] / 10000;
         }
 
         // 创建即时结算任务
@@ -408,7 +414,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
             token: token,
             totalAmount: revenue,
             executionTime: block.timestamp,
-            deadline: block.timestamp.add(3600), // 1小时后过期
+            deadline: block.timestamp + 3600, // 1小时后过期
             status: SettlementStatus.PENDING,
             dataHash: keccak256(abi.encodePacked(recipients, amounts)),
             metadata: musicId,
@@ -417,7 +423,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
             nextExecution: 0
         });
 
-        distribution.distributedAmount = distribution.distributedAmount.add(revenue);
+        distribution.distributedAmount = distribution.distributedAmount + revenue;
         distribution.lastDistribution = block.timestamp;
 
         // 立即执行
@@ -437,7 +443,7 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
         uint256 price,
         address paymentToken,
         bool isEscrow
-    ) external returns (bytes32 tradeHash) {
+    ) external payable returns (bytes32 tradeHash) {
         require(buyer != address(0) && seller != address(0), "Invalid addresses");
         require(amount > 0 && price > 0, "Invalid amounts");
 
@@ -452,14 +458,14 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
             amount: amount,
             price: price,
             paymentToken: paymentToken,
-            settlementTime: block.timestamp.add(300), // 5分钟后结算
+            settlementTime: block.timestamp + 300, // 5分钟后结算
             isEscrow: isEscrow,
             tradeHash: tradeHash
         });
 
         if (isEscrow) {
             // 托管模式：买方资金锁定在合约中
-            uint256 totalPayment = amount.mul(price);
+            uint256 totalPayment = amount * price;
             if (paymentToken == address(0)) {
                 require(msg.value >= totalPayment, "Insufficient ETH");
             } else {
@@ -471,12 +477,12 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
     /**
      * @dev 结算交易
      */
-    function settleTrade(bytes32 tradeHash) external nonReentrant {
+    function settleTrade(bytes32 tradeHash) external payable nonReentrant {
         TradeSettlement storage trade = tradeSettlements[tradeHash];
         require(trade.tradeHash != bytes32(0), "Trade not found");
         require(block.timestamp >= trade.settlementTime, "Too early to settle");
 
-        uint256 totalPayment = trade.amount.mul(trade.price);
+        uint256 totalPayment = trade.amount * trade.price;
 
         if (trade.isEscrow) {
             // 托管模式：从合约转账给卖方
@@ -560,8 +566,11 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
                     break;
                 }
             } else {
-                try IERC20(task.token).safeTransfer(recipient, amount) {
-                    // 转账成功
+                try IERC20(task.token).transfer(recipient, amount) returns (bool result) {
+                    if (!result) {
+                        success = false;
+                        break;
+                    }
                 } catch {
                     success = false;
                     break;
@@ -593,13 +602,13 @@ contract SettlementLayer is Ownable, ReentrancyGuard, Pausable {
             token: originalTask.token,
             totalAmount: originalTask.totalAmount,
             executionTime: originalTask.nextExecution,
-            deadline: originalTask.nextExecution.add(3600),
+            deadline: originalTask.nextExecution + 3600,
             status: SettlementStatus.PENDING,
             dataHash: originalTask.dataHash,
             metadata: originalTask.metadata,
             isRecurring: originalTask.isRecurring,
             recurringInterval: originalTask.recurringInterval,
-            nextExecution: originalTask.nextExecution.add(originalTask.recurringInterval)
+            nextExecution: originalTask.nextExecution + originalTask.recurringInterval
         });
 
         userTasks[originalTask.initiator].push(newTaskId);

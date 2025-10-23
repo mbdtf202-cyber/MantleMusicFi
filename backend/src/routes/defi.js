@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { ethers } = require('ethers');
-const auth = require('../middleware/auth');
+const { auth } = require('../middleware/auth');
 const rateLimit = require('express-rate-limit');
 
 // 限流中间件

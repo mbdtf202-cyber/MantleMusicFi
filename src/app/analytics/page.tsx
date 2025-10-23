@@ -1,57 +1,69 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Card from '@/components/ui/Card';
 import LineChart from '@/components/charts/LineChart';
 import BarChart from '@/components/charts/BarChart';
 import PieChart from '@/components/charts/PieChart';
 import { TrendingUp, Users, Music, DollarSign, Activity, Target } from 'lucide-react';
+import AnalyticsService, { AnalyticsData, ChartDataPoint, PieChartData } from '@/services/analyticsService';
 
 const AnalyticsPage = () => {
-  // Mock data for charts
-  const revenueData = [
-    { x: 'Jan', y: 12000 },
-    { x: 'Feb', y: 19000 },
-    { x: 'Mar', y: 15000 },
-    { x: 'Apr', y: 25000 },
-    { x: 'May', y: 22000 },
-    { x: 'Jun', y: 30000 },
-    { x: 'Jul', y: 28000 },
-  ];
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const userGrowthData = [
-    { x: 'Jan', y: 1200 },
-    { x: 'Feb', y: 1900 },
-    { x: 'Mar', y: 3000 },
-    { x: 'Apr', y: 5000 },
-    { x: 'May', y: 7200 },
-    { x: 'Jun', y: 9800 },
-    { x: 'Jul', y: 12500 },
-  ];
+  useEffect(() => {
+    const fetchAnalyticsData = async () => {
+      try {
+        setLoading(true);
+        const data = await AnalyticsService.getAnalyticsData();
+        setAnalyticsData(data);
+      } catch (err) {
+        setError('Failed to load analytics data');
+        console.error('Analytics data fetch error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const topArtistsData = [
-    { label: 'Artist A', value: 45, color: '#3B82F6' },
-    { label: 'Artist B', value: 32, color: '#8B5CF6' },
-    { label: 'Artist C', value: 28, color: '#F59E0B' },
-    { label: 'Artist D', value: 25, color: '#EF4444' },
-    { label: 'Artist E', value: 20, color: '#10B981' },
-  ];
+    fetchAnalyticsData();
+  }, []);
 
-  const genreDistribution = [
-    { label: 'Electronic', value: 35, color: '#3B82F6' },
-    { label: 'Pop', value: 28, color: '#8B5CF6' },
-    { label: 'Rock', value: 20, color: '#F59E0B' },
-    { label: 'Classical', value: 12, color: '#EF4444' },
-    { label: 'Others', value: 5, color: '#10B981' },
-  ];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+        <div className="cyber-grid opacity-20" />
+        <div className="relative z-10 container mx-auto px-4 py-8">
+          <div className="text-center text-white">
+            <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto"></div>
+            <p className="mt-4 text-xl">Loading analytics data...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const platformMetrics = [
-    { label: 'Total Users', value: 12500, icon: Users, color: '#3B82F6' },
-    { label: 'Active Artists', value: 850, icon: Music, color: '#8B5CF6' },
-    { label: 'Total Revenue (ETH)', value: 2847, icon: DollarSign, color: '#F59E0B' },
-    { label: 'Trading Volume', value: 15420, icon: Activity, color: '#10B981' },
-  ];
+  if (error || !analyticsData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+        <div className="cyber-grid opacity-20" />
+        <div className="relative z-10 container mx-auto px-4 py-8">
+          <div className="text-center text-white">
+            <p className="text-xl text-red-400">{error || 'Failed to load analytics data'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Use data from analytics service
+  const revenueData = analyticsData.revenueData;
+  const userGrowthData = analyticsData.userGrowthData;
+  const topArtistsData = analyticsData.topArtistsData;
+  const genreDistribution = analyticsData.genreDistribution;
+  const platformMetrics = analyticsData.platformMetrics;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
@@ -73,29 +85,22 @@ const AnalyticsPage = () => {
         </motion.div>
 
         {/* Key Metrics */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
-        >
-          {platformMetrics.map((metric, index) => (
-            <Card key={index} variant="glass" className="p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <Card variant="glass" className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-400 text-sm mb-1">{metric.label}</p>
+                  <p className="text-gray-400 text-sm mb-1">Total Users</p>
                   <p className="text-2xl font-bold text-white">
-                    {metric.value.toLocaleString()}
+                    {platformMetrics.totalUsers.toLocaleString()}
                   </p>
                 </div>
-                <div 
-                  className="p-3 rounded-lg"
-                  style={{ backgroundColor: `${metric.color}20` }}
-                >
-                  <metric.icon 
-                    className="w-6 h-6" 
-                    style={{ color: metric.color }}
-                  />
+                <div className="p-3 rounded-lg bg-blue-500/20">
+                  <Users className="w-6 h-6 text-blue-500" />
                 </div>
               </div>
               <div className="flex items-center mt-4 text-sm">
@@ -104,8 +109,83 @@ const AnalyticsPage = () => {
                 <span className="text-gray-400 ml-1">vs last month</span>
               </div>
             </Card>
-          ))}
-        </motion.div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <Card variant="glass" className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Active Artists</p>
+                  <p className="text-2xl font-bold text-white">
+                    {platformMetrics.activeArtists.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-purple-500/20">
+                  <Music className="w-6 h-6 text-purple-500" />
+                </div>
+              </div>
+              <div className="flex items-center mt-4 text-sm">
+                <TrendingUp className="w-4 h-4 text-green-400 mr-1" />
+                <span className="text-green-400">+8.3%</span>
+                <span className="text-gray-400 ml-1">vs last month</span>
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+          >
+            <Card variant="glass" className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Total Revenue (ETH)</p>
+                  <p className="text-2xl font-bold text-white">
+                    {platformMetrics.totalRevenue.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-yellow-500/20">
+                  <DollarSign className="w-6 h-6 text-yellow-500" />
+                </div>
+              </div>
+              <div className="flex items-center mt-4 text-sm">
+                <TrendingUp className="w-4 h-4 text-green-400 mr-1" />
+                <span className="text-green-400">+15.7%</span>
+                <span className="text-gray-400 ml-1">vs last month</span>
+              </div>
+            </Card>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <Card variant="glass" className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-400 text-sm mb-1">Trading Volume</p>
+                  <p className="text-2xl font-bold text-white">
+                    {platformMetrics.tradingVolume.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-green-500/20">
+                  <Activity className="w-6 h-6 text-green-500" />
+                </div>
+              </div>
+              <div className="flex items-center mt-4 text-sm">
+                <TrendingUp className="w-4 h-4 text-green-400 mr-1" />
+                <span className="text-green-400">+22.1%</span>
+                <span className="text-gray-400 ml-1">vs last month</span>
+              </div>
+            </Card>
+          </motion.div>
+        </div>
 
         {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">

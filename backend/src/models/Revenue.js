@@ -458,7 +458,7 @@ revenueSchema.methods.verify = function(verifiedBy, notes) {
   return this.save();
 };
 
-revenueSchema.methods.dispute = function(disputedBy, reason) {
+revenueSchema.methods.createDispute = function(disputedBy, reason) {
   this.dispute.isDisputed = true;
   this.dispute.disputedBy = disputedBy;
   this.dispute.disputedAt = new Date();

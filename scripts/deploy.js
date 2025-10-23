@@ -11,7 +11,7 @@ async function main() {
   // 部署 MRT Token 合约
   console.log("\n1. Deploying MRT Token...");
   const MRTToken = await ethers.getContractFactory("MRTToken");
-  const mrtToken = await MRTToken.deploy();
+  const mrtToken = await MRTToken.deploy(deployer.address);
   await mrtToken.waitForDeployment();
   const mrtTokenAddress = await mrtToken.getAddress();
   console.log("MRT Token deployed to:", mrtTokenAddress);
@@ -19,7 +19,7 @@ async function main() {
   // 部署 Treasury 合约
   console.log("\n2. Deploying Treasury...");
   const Treasury = await ethers.getContractFactory("Treasury");
-  const treasury = await Treasury.deploy(mrtTokenAddress);
+  const treasury = await Treasury.deploy(mrtTokenAddress, deployer.address);
   await treasury.waitForDeployment();
   const treasuryAddress = await treasury.getAddress();
   console.log("Treasury deployed to:", treasuryAddress);

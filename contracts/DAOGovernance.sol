@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/governance/Governor.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorSettings.sol";
@@ -8,8 +8,8 @@ import "@openzeppelin/contracts/governance/extensions/GovernorVotes.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol";
 import "@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
@@ -122,16 +122,7 @@ contract DAOGovernance is
         uint256 endTime
     );
     
-    event VoteCast(
-        address indexed voter,
-        uint256 indexed proposalId,
-        uint8 support,
-        uint256 weight,
-        string reason
-    );
-    
-    event ProposalExecuted(uint256 indexed proposalId);
-    event ProposalCanceled(uint256 indexed proposalId);
+    // Note: VoteCast, ProposalExecuted, and ProposalCanceled events are already defined in IGovernor
     event DelegationChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
     event ReputationUpdated(address indexed user, uint256 oldScore, uint256 newScore);
     event EmergencyProposerAdded(address indexed proposer);
@@ -140,13 +131,15 @@ contract DAOGovernance is
     constructor(
         IVotes _token,
         TimelockController _timelock,
-        address _treasuryAddress
+        address _treasuryAddress,
+        address initialOwner
     )
         Governor("MantleMusic DAO")
         GovernorSettings(1, 45818, 0) // 1 block, ~1 week, 0 proposal threshold
         GovernorVotes(_token)
         GovernorVotesQuorumFraction(4) // 4%
         GovernorTimelockControl(_timelock)
+        Ownable(initialOwner)
     {
         governanceToken = IERC20(address(_token));
         treasuryAddress = _treasuryAddress;
@@ -158,15 +151,15 @@ contract DAOGovernance is
     }
 
     // 重写必要的函数
-    function votingDelay() public view override(IGovernor, GovernorSettings) returns (uint256) {
+    function votingDelay() public view override(Governor, GovernorSettings) returns (uint256) {
         return super.votingDelay();
     }
 
-    function votingPeriod() public view override(IGovernor, GovernorSettings) returns (uint256) {
+    function votingPeriod() public view override(Governor, GovernorSettings) returns (uint256) {
         return super.votingPeriod();
     }
 
-    function quorum(uint256 blockNumber) public view override(IGovernor, GovernorVotesQuorumFraction) returns (uint256) {
+    function quorum(uint256 blockNumber) public view override(Governor, GovernorVotesQuorumFraction) returns (uint256) {
         return super.quorum(blockNumber);
     }
 
@@ -174,16 +167,34 @@ contract DAOGovernance is
         return super.proposalThreshold();
     }
 
-    function _execute(
+    function state(uint256 proposalId) public view override(Governor, GovernorTimelockControl) returns (ProposalState) {
+        return super.state(proposalId);
+    }
+
+    function proposalNeedsQueuing(uint256 proposalId) public view override(Governor, GovernorTimelockControl) returns (bool) {
+        return super.proposalNeedsQueuing(proposalId);
+    }
+
+    function _queueOperations(
+        uint256 proposalId,
+        address[] memory targets,
+        uint256[] memory values,
+        bytes[] memory calldatas,
+        bytes32 descriptionHash
+    ) internal override(Governor, GovernorTimelockControl) returns (uint48) {
+        return super._queueOperations(proposalId, targets, values, calldatas, descriptionHash);
+    }
+
+    function _executeOperations(
         uint256 proposalId,
         address[] memory targets,
         uint256[] memory values,
         bytes[] memory calldatas,
         bytes32 descriptionHash
     ) internal override(Governor, GovernorTimelockControl) {
-        super._execute(proposalId, targets, values, calldatas, descriptionHash);
+        super._executeOperations(proposalId, targets, values, calldatas, descriptionHash);
         proposalDetails[proposalId].executed = true;
-        emit ProposalExecuted(proposalId);
+        // Note: ProposalExecuted event is automatically emitted by the base Governor contract
     }
 
     function _cancel(
@@ -202,7 +213,7 @@ contract DAOGovernance is
         return super._executor();
     }
 
-    function supportsInterface(bytes4 interfaceId) public view override(Governor, GovernorTimelockControl) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view override(Governor) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
 

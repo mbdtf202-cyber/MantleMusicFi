@@ -7,7 +7,7 @@ import logging
 import tempfile
 import os
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from pydantic import BaseModel, Field
 import aiofiles
 
@@ -45,9 +45,11 @@ class LyricsAnalysisResponse(BaseModel):
     message: str = ""
 
 # 依赖注入
-async def get_model_manager() -> ModelManager:
+async def get_model_manager(request: Request) -> ModelManager:
     """获取模型管理器"""
-    from main import model_manager
+    model_manager = getattr(request.app.state, 'model_manager', None)
+    if model_manager is None:
+        raise HTTPException(status_code=500, detail="模型管理器未初始化")
     return model_manager
 
 @router.post("/audio/features", response_model=AudioFeaturesResponse)

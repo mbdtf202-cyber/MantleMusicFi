@@ -1,25 +1,21 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 /**
  * @title PrivacyCompliance
  * @dev Implements ZK-KYC verification and Soulbound Tokens (SBT) for privacy-preserving compliance
  */
 contract PrivacyCompliance is ERC721, AccessControl, Pausable, ReentrancyGuard {
-    using Counters for Counters.Counter;
-
     // Roles
     bytes32 public constant VERIFIER_ROLE = keccak256("VERIFIER_ROLE");
     bytes32 public constant COMPLIANCE_OFFICER_ROLE = keccak256("COMPLIANCE_OFFICER_ROLE");
 
-    // Counters
-    Counters.Counter private _tokenIdCounter;
+    // Token ID counter
+    uint256 private _tokenIdCounter;
 
     // ZK-KYC verification status
     enum VerificationStatus {
@@ -254,8 +250,8 @@ contract PrivacyCompliance is ERC721, AccessControl, Pausable, ReentrancyGuard {
     ) internal {
         require(_to != address(0), "Cannot issue to zero address");
 
-        _tokenIdCounter.increment();
-        uint256 tokenId = _tokenIdCounter.current();
+        _tokenIdCounter++;
+        uint256 tokenId = _tokenIdCounter;
 
         // Create SBT
         soulboundTokens[tokenId] = SoulboundToken({
@@ -287,7 +283,7 @@ contract PrivacyCompliance is ERC721, AccessControl, Pausable, ReentrancyGuard {
         uint256 _tokenId,
         string calldata _reason
     ) external onlyRole(COMPLIANCE_OFFICER_ROLE) {
-        require(_exists(_tokenId), "Token does not exist");
+        require(soulboundTokens[_tokenId].holder != address(0), "Token does not exist");
         require(soulboundTokens[_tokenId].isActive, "Token already revoked");
 
         address holder = soulboundTokens[_tokenId].holder;
@@ -409,7 +405,7 @@ contract PrivacyCompliance is ERC721, AccessControl, Pausable, ReentrancyGuard {
         uint256 issuedTime,
         uint256 expiryTime
     ) {
-        require(_exists(_tokenId), "Token does not exist");
+        require(soulboundTokens[_tokenId].holder != address(0), "Token does not exist");
         SoulboundToken memory sbt = soulboundTokens[_tokenId];
         return (
             sbt.holder,
@@ -435,21 +431,17 @@ contract PrivacyCompliance is ERC721, AccessControl, Pausable, ReentrancyGuard {
         return sbt.score;
     }
 
-    // Override transfer functions to make tokens soulbound
-    function transferFrom(address, address, uint256) public pure override {
-        revert("Soulbound tokens cannot be transferred");
-    }
-
-    function safeTransferFrom(address, address, uint256) public pure override {
-        revert("Soulbound tokens cannot be transferred");
-    }
-
-    function safeTransferFrom(address, address, uint256, bytes memory) public pure override {
-        revert("Soulbound tokens cannot be transferred");
-    }
-
-    function approve(address, uint256) public pure override {
-        revert("Soulbound tokens cannot be approved");
+    // Override _update function to make tokens soulbound
+    function _update(address to, uint256 tokenId, address auth) internal virtual override returns (address) {
+        address from = _ownerOf(tokenId);
+        
+        // Allow minting (from == address(0)) and burning (to == address(0))
+        // But prevent transfers between addresses
+        if (from != address(0) && to != address(0)) {
+            revert("Soulbound tokens cannot be transferred");
+        }
+        
+        return super._update(to, tokenId, auth);
     }
 
     function setApprovalForAll(address, bool) public pure override {
@@ -476,7 +468,7 @@ contract PrivacyCompliance is ERC721, AccessControl, Pausable, ReentrancyGuard {
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        require(_exists(tokenId), "Token does not exist");
+        require(soulboundTokens[tokenId].holder != address(0), "Token does not exist");
         return soulboundTokens[tokenId].metadataURI;
     }
 }
