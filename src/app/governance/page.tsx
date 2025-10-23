@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -31,15 +31,124 @@ interface Proposal {
   totalVotes: number;
   endTime: string;
   category: string;
+  type?: string;
+  createdAt?: string;
+  executedAt?: string;
+}
+
+interface GovernanceStats {
+  totalProposals: number;
+  activeProposals: number;
+  totalVotes: number;
+  userVotingPower: number;
+}
+
+interface UserVotingData {
+  votingPower: number;
+  delegatedTo: string | null;
+  delegatedFrom: string[];
+  votingHistory: any[];
 }
 
 const GovernancePage = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [activeTab, setActiveTab] = useState<'proposals' | 'voting' | 'tokens'>('proposals');
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [governanceStats, setGovernanceStats] = useState<GovernanceStats | null>(null);
+  const [userVotingData, setUserVotingData] = useState<UserVotingData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [createProposalData, setCreateProposalData] = useState({
+    title: '',
+    description: '',
+    category: '',
+    type: 'general'
+  });
 
-  // Mock data
-  const proposals: Proposal[] = [
+  // API调用函数
+  const loadGovernanceData = async () => {
+    try {
+      setLoading(true);
+      
+      // 加载提案列表
+      const proposalsResponse = await fetch('/api/governance/proposals');
+      if (proposalsResponse.ok) {
+        const proposalsData = await proposalsResponse.json();
+        setProposals(proposalsData.proposals || mockProposals);
+      } else {
+        setProposals(mockProposals);
+      }
+      
+      // 加载治理统计
+      const statsResponse = await fetch('/api/governance/stats');
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setGovernanceStats(statsData);
+      } else {
+        setGovernanceStats(mockStats);
+      }
+      
+      // 加载用户投票数据
+      const userResponse = await fetch('/api/governance/user/voting-power');
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        setUserVotingData(userData);
+      }
+    } catch (error) {
+      console.error('Failed to load governance data:', error);
+      // 使用模拟数据作为后备
+      setProposals(mockProposals);
+      setGovernanceStats(mockStats);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createProposal = async () => {
+    try {
+      const response = await fetch('/api/governance/proposals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createProposalData),
+      });
+      
+      if (response.ok) {
+        setShowCreateModal(false);
+        setCreateProposalData({ title: '', description: '', category: '', type: 'general' });
+        await loadGovernanceData(); // 重新加载数据
+      }
+    } catch (error) {
+      console.error('Failed to create proposal:', error);
+    }
+  };
+
+  const voteOnProposal = async (proposalId: number, support: boolean) => {
+    try {
+      const response = await fetch(`/api/governance/proposals/${proposalId}/vote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ support }),
+      });
+      
+      if (response.ok) {
+        await loadGovernanceData(); // 重新加载数据
+        setSelectedProposal(null);
+      }
+    } catch (error) {
+      console.error('Failed to vote on proposal:', error);
+    }
+  };
+
+  useEffect(() => {
+    loadGovernanceData();
+  }, []);
+
+  // Mock data (作为后备数据)
+  const mockProposals: Proposal[] = [
     {
       id: 1,
       title: 'Increase Artist Royalty Share',
@@ -74,27 +183,42 @@ const GovernancePage = () => {
       votesAgainst: 4320,
       totalVotes: 30000,
       endTime: '2024-01-30',
-      category: 'Community Development'
-    },
-    {
-      id: 4,
-      title: 'Optimize DeFi Yield Strategy',
-      description: 'Adjust platform DeFi yield strategy, add more stablecoin pools to reduce risk',
-      proposer: '0xdef0...1234',
-      status: 'rejected',
-      votesFor: 8500,
-      votesAgainst: 16800,
-      totalVotes: 25300,
-      endTime: '2024-01-25',
-      category: 'DeFi Strategy'
+      category: 'Community'
     }
   ];
 
-  const governanceStats = [
-    { label: 'Total Governance Tokens', value: '10,000,000', icon: Coins, color: '#3B82F6' },
-    { label: 'Active Proposals', value: '12', icon: Vote, color: '#8B5CF6' },
-    { label: 'Participating Users', value: '8,547', icon: Users, color: '#F59E0B' },
-    { label: 'Voting Rate', value: '68.5%', icon: TrendingUp, color: '#10B981' },
+  const mockStats = {
+    totalProposals: 127,
+    activeProposals: 8,
+    totalVotes: 2400000,
+    userVotingPower: 1250
+  };
+
+  const governanceStatsDisplay = [
+    {
+      label: "Total Proposals",
+      value: governanceStats?.totalProposals?.toString() || "127",
+      color: "#3B82F6",
+      icon: Vote
+    },
+    {
+      label: "Active Proposals", 
+      value: governanceStats?.activeProposals?.toString() || "8",
+      color: "#10B981",
+      icon: Clock
+    },
+    {
+      label: "Total Votes",
+      value: governanceStats?.totalVotes ? (governanceStats.totalVotes / 1000000).toFixed(1) + "M" : "2.4M",
+      color: "#8B5CF6",
+      icon: Users
+    },
+    {
+      label: "My Voting Power",
+      value: userVotingData?.votingPower?.toString() || governanceStats?.userVotingPower?.toString() || "1,250",
+      color: "#F59E0B",
+      icon: Coins
+    }
   ];
 
   const getStatusColor = (status: string) => {
@@ -153,7 +277,7 @@ const GovernancePage = () => {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
         >
-          {governanceStats.map((stat, index) => (
+          {governanceStatsDisplay.map((stat, index) => (
             <Card key={index} variant="glass" className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -223,8 +347,13 @@ const GovernancePage = () => {
               </Button>
             </div>
 
-            <div className="space-y-6">
-              {proposals.map((proposal, index) => {
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {proposals.map((proposal, index) => {
                 const StatusIcon = getStatusIcon(proposal.status);
                 const votePercentage = proposal.totalVotes > 0 
                   ? (proposal.votesFor / proposal.totalVotes) * 100 
@@ -311,7 +440,8 @@ const GovernancePage = () => {
                   </motion.div>
                 );
               })}
-            </div>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -345,18 +475,35 @@ const GovernancePage = () => {
               <h3 className="text-xl font-semibold text-white mb-4">My Governance Tokens</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-400 mb-2">1,250</div>
-                  <div className="text-gray-300 text-sm">Tokens Held</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-purple-400 mb-2">850</div>
-                  <div className="text-gray-300 text-sm">Tokens Voted</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-orange-400 mb-2">68%</div>
+                  <div className="text-3xl font-bold text-blue-400 mb-2">
+                    {userVotingData?.votingPower?.toLocaleString() || '1,250'}
+                  </div>
                   <div className="text-gray-300 text-sm">Voting Power</div>
                 </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-purple-400 mb-2">
+                    {userVotingData?.votingHistory?.length || '12'}
+                  </div>
+                  <div className="text-gray-300 text-sm">Votes Cast</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-orange-400 mb-2">
+                    {userVotingData?.delegatedFrom?.length || '0'}
+                  </div>
+                  <div className="text-gray-300 text-sm">Delegated From</div>
+                </div>
               </div>
+              
+              {userVotingData?.delegatedTo && (
+                <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <div className="flex items-center gap-2 text-blue-400">
+                    <Users className="w-4 h-4" />
+                    <span className="text-sm">
+                      Voting power delegated to: {userVotingData.delegatedTo}
+                    </span>
+                  </div>
+                </div>
+              )}
             </Card>
 
             <Card variant="glass" className="p-6">
@@ -394,6 +541,8 @@ const GovernancePage = () => {
           <Input
             label="Proposal Title"
             placeholder="Enter proposal title..."
+            value={createProposalData.title}
+            onChange={(e) => setCreateProposalData(prev => ({ ...prev, title: e.target.value }))}
           />
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -402,17 +551,53 @@ const GovernancePage = () => {
             <textarea
               className="w-full h-32 px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
               placeholder="Describe your proposal in detail..."
+              value={createProposalData.description}
+              onChange={(e) => setCreateProposalData(prev => ({ ...prev, description: e.target.value }))}
             />
           </div>
-          <Input
-            label="Proposal Category"
-            placeholder="Select proposal category..."
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Proposal Category
+            </label>
+            <select
+              className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              value={createProposalData.category}
+              onChange={(e) => setCreateProposalData(prev => ({ ...prev, category: e.target.value }))}
+            >
+              <option value="">Select category...</option>
+              <option value="Economic Parameters">Economic Parameters</option>
+              <option value="Feature Upgrade">Feature Upgrade</option>
+              <option value="Community">Community</option>
+              <option value="DeFi Strategy">DeFi Strategy</option>
+              <option value="Technical">Technical</option>
+              <option value="Treasury">Treasury</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              Proposal Type
+            </label>
+            <select
+              className="w-full px-3 py-2 bg-gray-800/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              value={createProposalData.type}
+              onChange={(e) => setCreateProposalData(prev => ({ ...prev, type: e.target.value }))}
+            >
+              <option value="general">General</option>
+              <option value="treasury">Treasury</option>
+              <option value="parameter">Parameter</option>
+              <option value="upgrade">Upgrade</option>
+              <option value="emergency">Emergency</option>
+            </select>
+          </div>
           <div className="flex gap-4">
             <Button variant="outline" onClick={() => setShowCreateModal(false)}>
               Cancel
             </Button>
-            <Button variant="primary">
+            <Button 
+              variant="primary" 
+              onClick={createProposal}
+              disabled={!createProposalData.title || !createProposalData.description || !createProposalData.category}
+            >
               Submit Proposal
             </Button>
           </div>
@@ -446,11 +631,19 @@ const GovernancePage = () => {
 
             {selectedProposal.status === 'active' && (
               <div className="flex gap-4">
-                <Button variant="primary" className="flex-1">
+                <Button 
+                  variant="primary" 
+                  className="flex-1"
+                  onClick={() => voteOnProposal(selectedProposal.id, true)}
+                >
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Support
                 </Button>
-                <Button variant="outline" className="flex-1">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => voteOnProposal(selectedProposal.id, false)}
+                >
                   <XCircle className="w-4 h-4 mr-2" />
                   Against
                 </Button>

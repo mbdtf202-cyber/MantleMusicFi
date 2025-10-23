@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   TrendingUp, 
@@ -14,11 +14,20 @@ import {
   Star,
   Filter,
   Search,
-  RefreshCw
+  RefreshCw,
+  Users,
+  Target,
+  Activity,
+  Shield,
+  Zap,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
+import PortfolioOverview from '@/components/portfolio/PortfolioOverview';
+import AdvancedChart from '@/components/charts/AdvancedChart';
 
 interface Investment {
   id: string;
@@ -30,23 +39,143 @@ interface Investment {
   dailyReturn: number;
   totalReturn: number;
   returnPercentage: number;
-  status: 'active' | 'matured' | 'pending';
+  status: string;
 }
 
-interface MarketTrack {
+interface MarketSong {
   id: string;
   title: string;
   artist: string;
   price: number;
   change24h: number;
-  volume24h: number;
+  volume: number;
   marketCap: number;
-  rating: number;
+  genre: string;
+  trending?: boolean;
+}
+
+interface DeFiMetrics {
+  totalValueLocked: number;
+  stakingRewards: number;
+  liquidityPools: number;
+  governanceTokens: number;
 }
 
 const InvestorDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'portfolio' | 'market' | 'analytics'>('portfolio');
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'market' | 'analytics' | 'defi'>('portfolio');
   const [searchTerm, setSearchTerm] = useState('');
+  const [investments, setInvestments] = useState<Investment[]>([]);
+  const [marketSongs, setMarketSongs] = useState<MarketSong[]>([]);
+  const [portfolioData, setPortfolioData] = useState<any[]>([]);
+  const [defiMetrics, setDefiMetrics] = useState<DeFiMetrics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [hideBalances, setHideBalances] = useState(false);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      // Simulate API calls with more realistic data
+      setTimeout(() => {
+        setInvestments([
+          {
+            id: '1',
+            trackTitle: 'Midnight Dreams',
+            artist: 'Luna Echo',
+            mrtTokens: 300,
+            investmentAmount: 1.5,
+            currentValue: 2.1,
+            dailyReturn: 0.05,
+            totalReturn: 0.6,
+            returnPercentage: 40,
+            status: 'active'
+          },
+          {
+            id: '2',
+            trackTitle: 'Ocean Waves',
+            artist: 'Aqua Sound',
+            mrtTokens: 160,
+            investmentAmount: 0.8,
+            currentValue: 0.95,
+            dailyReturn: 0.02,
+            totalReturn: 0.15,
+            returnPercentage: 18.75,
+            status: 'active'
+          },
+          {
+            id: '3',
+            trackTitle: 'City Lights',
+            artist: 'Urban Pulse',
+            mrtTokens: 400,
+            investmentAmount: 2.0,
+            currentValue: 1.7,
+            dailyReturn: -0.03,
+            totalReturn: -0.3,
+            returnPercentage: -15,
+            status: 'active'
+          }
+        ]);
+
+        setMarketSongs([
+          {
+            id: '1',
+            title: 'Stellar Journey',
+            artist: 'Cosmic Beats',
+            price: 0.45,
+            change24h: 12.5,
+            volume: 15.2,
+            marketCap: 125.8,
+            genre: 'Electronic',
+            trending: true
+          },
+          {
+            id: '2',
+            title: 'Forest Whispers',
+            artist: 'Nature Sounds',
+            price: 0.32,
+            change24h: -5.2,
+            volume: 8.7,
+            marketCap: 89.3,
+            genre: 'Ambient'
+          },
+          {
+            id: '3',
+            title: 'Neon Nights',
+            artist: 'Synth Wave',
+            price: 0.78,
+            change24h: 8.9,
+            volume: 22.1,
+            marketCap: 198.5,
+            genre: 'Synthwave',
+            trending: true
+          }
+        ]);
+
+        setPortfolioData([
+          { x: 'Jan', y: 4.2 },
+          { x: 'Feb', y: 4.8 },
+          { x: 'Mar', y: 4.1 },
+          { x: 'Apr', y: 5.2 },
+          { x: 'May', y: 4.9 },
+          { x: 'Jun', y: 5.8 }
+        ]);
+
+        setDefiMetrics({
+          totalValueLocked: 2.4,
+          stakingRewards: 0.15,
+          liquidityPools: 1.8,
+          governanceTokens: 450
+        });
+
+        setLoading(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+      setLoading(false);
+    }
+  };
 
   const mockInvestments: Investment[] = [
     {
@@ -159,16 +288,44 @@ const InvestorDashboard: React.FC = () => {
     },
   ];
 
+  const totalInvested = investments.reduce((sum, inv) => sum + inv.investmentAmount, 0);
+  const totalValue = investments.reduce((sum, inv) => sum + inv.currentValue, 0);
+  const totalReturns = totalValue - totalInvested;
+  const totalReturnPercentage = totalInvested > 0 ? (totalReturns / totalInvested) * 100 : 0;
+
+  const formatCurrency = (value: number, decimals: number = 4) => {
+    if (hideBalances) return '****';
+    return `${value.toFixed(decimals)} ETH`;
+  };
+
+  const formatPercentage = (value: number) => {
+    const isPositive = value >= 0;
+    return (
+      <span className={`flex items-center ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+        {isPositive ? <ArrowUpRight className="w-4 h-4 mr-1" /> : <ArrowDownRight className="w-4 h-4 mr-1" />}
+        {Math.abs(value).toFixed(2)}%
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <RefreshCw className="w-8 h-8 animate-spin text-primary-400" />
+      </div>
+    );
+  }
+
   const tabs = [
     { id: 'portfolio', label: 'Portfolio', icon: PieChart },
     { id: 'market', label: 'Market', icon: TrendingUp },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'defi', label: 'DeFi', icon: Zap },
   ];
 
   const totalInvestment = mockInvestments.reduce((sum, inv) => sum + inv.investmentAmount, 0);
   const totalCurrentValue = mockInvestments.reduce((sum, inv) => sum + inv.currentValue, 0);
   const totalReturn = totalCurrentValue - totalInvestment;
-  const totalReturnPercentage = (totalReturn / totalInvestment) * 100;
 
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -185,15 +342,27 @@ const InvestorDashboard: React.FC = () => {
                 Investment Dashboard
               </h1>
               <p className="text-gray-400">
-                Manage your MRT investment portfolio and track performance
+                Track your music asset investments and market opportunities
               </p>
             </div>
-            <Button
-              variant="outline"
-              leftIcon={<RefreshCw className="w-4 h-4" />}
-            >
-              Refresh Data
-            </Button>
+            <div className="flex items-center space-x-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setHideBalances(!hideBalances)}
+                leftIcon={hideBalances ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              >
+                {hideBalances ? 'Show' : 'Hide'} Balances
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchDashboardData}
+                leftIcon={<RefreshCw className="w-4 h-4" />}
+              >
+                Refresh
+              </Button>
+            </div>
           </div>
         </motion.div>
 
@@ -263,250 +432,319 @@ const InvestorDashboard: React.FC = () => {
 
         {/* Portfolio Tab */}
         {activeTab === 'portfolio' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            {/* Portfolio Summary */}
-            <Card variant="gradient">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-white mb-2">
-                    ${totalInvestment.toLocaleString()}
-                  </div>
-                  <div className="text-gray-300">Total Investment Amount</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-white mb-2">
-                    ${totalCurrentValue.toLocaleString()}
-                  </div>
-                  <div className="text-gray-300">Current Value</div>
-                </div>
-                <div className="text-center">
-                  <div className={`text-3xl font-bold mb-2 ${totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {totalReturn >= 0 ? '+' : ''}${totalReturn.toLocaleString()}
-                  </div>
-                  <div className="text-gray-300">
-                    Total Return ({totalReturnPercentage >= 0 ? '+' : ''}{totalReturnPercentage.toFixed(1)}%)
-                  </div>
-                </div>
-              </div>
-            </Card>
+          <PortfolioOverview userId="user123" />
 
-            {/* Investment List */}
-            <Card variant="glass">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-semibold text-white">My Investments</h3>
-                <div className="flex space-x-2">
-                  <Button variant="outline" size="sm" leftIcon={<Filter className="w-4 h-4" />}>
-                    Filter
-                  </Button>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Track</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">MRT Amount</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Investment Amount</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Current Value</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Daily Return</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Total Return</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mockInvestments.map((investment) => (
-                      <tr key={investment.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
-                        <td className="py-4 px-4">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
-                              <Music className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                              <div className="text-white font-medium">{investment.trackTitle}</div>
-                              <div className="text-gray-400 text-sm">{investment.artist}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-gray-300">{investment.mrtTokens}</td>
-                        <td className="py-4 px-4 text-gray-300">${investment.investmentAmount.toLocaleString()}</td>
-                        <td className="py-4 px-4 text-gray-300">${investment.currentValue.toLocaleString()}</td>
-                        <td className="py-4 px-4">
-                          <div className={`flex items-center ${investment.dailyReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {investment.dailyReturn >= 0 ? (
-                              <ArrowUpRight className="w-4 h-4 mr-1" />
-                            ) : (
-                              <ArrowDownRight className="w-4 h-4 mr-1" />
-                            )}
-                            ${Math.abs(investment.dailyReturn)}
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className={investment.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}>
-                            {investment.totalReturn >= 0 ? '+' : ''}${investment.totalReturn}
-                            <div className="text-xs">
-                              ({investment.returnPercentage >= 0 ? '+' : ''}{investment.returnPercentage.toFixed(1)}%)
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            investment.status === 'active' ? 'text-green-400 bg-green-400/20' :
-                            investment.status === 'matured' ? 'text-blue-400 bg-blue-400/20' :
-                            'text-yellow-400 bg-yellow-400/20'
-                          }`}>
-                            {investment.status === 'active' ? 'Active' :
-                         investment.status === 'matured' ? 'Matured' : 'Pending'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </motion.div>
         )}
 
         {/* Market Tab */}
         {activeTab === 'market' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            {/* Search and Filters */}
-            <Card variant="glass">
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                  <Input
-                    placeholder="Search tracks or artists..."
-                    leftIcon={<Search className="w-4 h-4" />}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
+          <div className="space-y-6">
+            {/* Market Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card variant="glass" className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-blue-500/20">
+                    <Activity className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <span className="text-sm text-green-400">+5.2%</span>
                 </div>
+                <h3 className="text-sm text-gray-400 mb-1">Market Cap</h3>
+                <p className="text-2xl font-bold text-white">1,234.5 ETH</p>
+              </Card>
+
+              <Card variant="glass" className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-green-500/20">
+                    <TrendingUp className="w-6 h-6 text-green-400" />
+                  </div>
+                  <span className="text-sm text-green-400">+12.8%</span>
+                </div>
+                <h3 className="text-sm text-gray-400 mb-1">24h Volume</h3>
+                <p className="text-2xl font-bold text-white">89.3 ETH</p>
+              </Card>
+
+              <Card variant="glass" className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-purple-500/20">
+                    <Music className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <span className="text-sm text-gray-400">Active</span>
+                </div>
+                <h3 className="text-sm text-gray-400 mb-1">Listed Songs</h3>
+                <p className="text-2xl font-bold text-white">1,567</p>
+              </Card>
+
+              <Card variant="glass" className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-yellow-500/20">
+                    <Users className="w-6 h-6 text-yellow-400" />
+                  </div>
+                  <span className="text-sm text-green-400">+234</span>
+                </div>
+                <h3 className="text-sm text-gray-400 mb-1">Active Traders</h3>
+                <p className="text-2xl font-bold text-white">8,923</p>
+              </Card>
+            </div>
+
+            {/* Trending Songs */}
+            <Card variant="glass">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-white">Trending Songs</h3>
                 <div className="flex space-x-2">
                   <Button variant="outline" size="sm">
-                    Popular
+                    All Genres
                   </Button>
-                  <Button variant="outline" size="sm">
-                    New Listed
-                  </Button>
-                  <Button variant="outline" size="sm">
-                    High Yield
+                  <Button variant="outline" size="sm" leftIcon={<RefreshCw className="w-4 h-4" />}>
+                    Refresh
                   </Button>
                 </div>
               </div>
-            </Card>
-
-            {/* Market List */}
-            <Card variant="glass">
-              <h3 className="text-xl font-semibold text-white mb-6">Market Trends</h3>
-              
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-700">
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Track</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Price</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">24h Change</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">24h Volume</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Market Cap</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Rating</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-medium">Action</th>
+                      <th className="text-left py-3 px-4 text-gray-400 font-medium">Song</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Price</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">24h Change</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Volume</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Market Cap</th>
+                      <th className="text-right py-3 px-4 text-gray-400 font-medium">Action</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {mockMarketTracks.map((track) => (
-                      <tr key={track.id} className="border-b border-gray-800/50 hover:bg-gray-800/30">
+                    {marketSongs.map((song) => (
+                      <motion.tr
+                        key={song.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
+                      >
                         <td className="py-4 px-4">
                           <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-lg flex items-center justify-center">
-                              <Music className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                              <div className="text-white font-medium">{track.title}</div>
-                              <div className="text-gray-400 text-sm">{track.artist}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 text-gray-300">${track.price.toFixed(2)}</td>
-                        <td className="py-4 px-4">
-                          <div className={`flex items-center ${track.change24h >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {track.change24h >= 0 ? (
-                              <ArrowUpRight className="w-4 h-4 mr-1" />
-                            ) : (
-                              <ArrowDownRight className="w-4 h-4 mr-1" />
+                            {song.trending && (
+                              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                             )}
-                            {Math.abs(track.change24h).toFixed(1)}%
+                            <div>
+                              <div className="font-semibold text-white">{song.title}</div>
+                              <div className="text-sm text-gray-400">{song.artist}</div>
+                            </div>
                           </div>
                         </td>
-                        <td className="py-4 px-4 text-gray-300">${track.volume24h.toLocaleString()}</td>
-                        <td className="py-4 px-4 text-gray-300">${track.marketCap.toLocaleString()}</td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center">
-                            <Star className="w-4 h-4 text-yellow-400 mr-1" />
-                            <span className="text-gray-300">{track.rating}</span>
-                          </div>
+                        <td className="text-right py-4 px-4 text-white">
+                          {formatCurrency(song.price)}
                         </td>
-                        <td className="py-4 px-4">
+                        <td className="text-right py-4 px-4">
+                          {formatPercentage(song.change24h)}
+                        </td>
+                        <td className="text-right py-4 px-4 text-white">
+                          {formatCurrency(song.volume)}
+                        </td>
+                        <td className="text-right py-4 px-4 text-white">
+                          {formatCurrency(song.marketCap)}
+                        </td>
+                        <td className="text-right py-4 px-4">
                           <Button variant="primary" size="sm">
                             Invest
                           </Button>
                         </td>
-                      </tr>
+                      </motion.tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </Card>
-          </motion.div>
+          </div>
         )}
 
         {/* Analytics Tab */}
         {activeTab === 'analytics' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
+          <div className="space-y-6">
+            {/* Market Performance Chart */}
+            <Card variant="glass" className="p-6">
+              <h3 className="text-xl font-semibold text-white mb-6">Market Performance</h3>
+              <div className="h-80">
+                <AdvancedChart
+                  data={portfolioData}
+                  type="area"
+                  color="#00D4AA"
+                  gradient={true}
+                  showGrid={true}
+                  showTooltip={true}
+                  interactive={true}
+                />
+              </div>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card variant="glass">
-                <h4 className="text-lg font-semibold text-white mb-4">Portfolio Performance</h4>
-                <div className="h-64 flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Portfolio chart will be displayed here</p>
-                  </div>
+              <Card variant="glass" className="p-6">
+                <h3 className="text-xl font-semibold text-white mb-6">Genre Distribution</h3>
+                <div className="space-y-4">
+                  {[
+                    { genre: 'Electronic', percentage: 35, color: 'bg-blue-500' },
+                    { genre: 'Hip Hop', percentage: 25, color: 'bg-purple-500' },
+                    { genre: 'Ambient', percentage: 20, color: 'bg-green-500' },
+                    { genre: 'Synthwave', percentage: 15, color: 'bg-pink-500' },
+                    { genre: 'Jazz', percentage: 5, color: 'bg-yellow-500' }
+                  ].map(({ genre, percentage, color }) => (
+                    <div key={genre} className="flex items-center justify-between">
+                      <span className="text-gray-300">{genre}</span>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-32 bg-gray-700 rounded-full h-2">
+                          <div
+                            className={`${color} h-2 rounded-full transition-all duration-500`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                        <span className="text-white text-sm w-10 text-right">{percentage}%</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </Card>
 
-              <Card variant="glass">
-                <h4 className="text-lg font-semibold text-white mb-4">Return Distribution</h4>
-                <div className="h-64 flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <PieChart className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Return distribution chart will be displayed here</p>
+              <Card variant="glass" className="p-6">
+                <h3 className="text-xl font-semibold text-white mb-6">Risk Analysis</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Portfolio Risk</span>
+                    <span className="text-green-400 flex items-center">
+                      <Shield className="w-4 h-4 mr-1" />
+                      Low
+                    </span>
                   </div>
-                </div>
-              </Card>
-
-              <Card variant="glass" className="lg:col-span-2">
-                <h4 className="text-lg font-semibold text-white mb-4">Market Trends</h4>
-                <div className="h-64 flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Market trends chart will be displayed here</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Diversification</span>
+                    <span className="text-blue-400">Good</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Volatility</span>
+                    <span className="text-yellow-400">Medium</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Sharpe Ratio</span>
+                    <span className="text-green-400">1.24</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Beta</span>
+                    <span className="text-blue-400">0.85</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300">Max Drawdown</span>
+                    <span className="text-red-400">-8.5%</span>
                   </div>
                 </div>
               </Card>
             </div>
-          </motion.div>
+          </div>
+        )}
+
+        {/* DeFi Tab */}
+        {activeTab === 'defi' && defiMetrics && (
+          <div className="space-y-6">
+            {/* DeFi Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <Card variant="glass" className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-primary-500/20">
+                    <DollarSign className="w-6 h-6 text-primary-400" />
+                  </div>
+                  <span className="text-sm text-green-400">+8.2%</span>
+                </div>
+                <h3 className="text-sm text-gray-400 mb-1">Total Value Locked</h3>
+                <p className="text-2xl font-bold text-white">{formatCurrency(defiMetrics.totalValueLocked)}</p>
+              </Card>
+
+              <Card variant="glass" className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-green-500/20">
+                    <Zap className="w-6 h-6 text-green-400" />
+                  </div>
+                  <span className="text-sm text-green-400">APY 12.5%</span>
+                </div>
+                <h3 className="text-sm text-gray-400 mb-1">Staking Rewards</h3>
+                <p className="text-2xl font-bold text-white">{formatCurrency(defiMetrics.stakingRewards)}</p>
+              </Card>
+
+              <Card variant="glass" className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-blue-500/20">
+                    <Activity className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <span className="text-sm text-blue-400">5 Pools</span>
+                </div>
+                <h3 className="text-sm text-gray-400 mb-1">Liquidity Provided</h3>
+                <p className="text-2xl font-bold text-white">{formatCurrency(defiMetrics.liquidityPools)}</p>
+              </Card>
+
+              <Card variant="glass" className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-3 rounded-lg bg-purple-500/20">
+                    <Target className="w-6 h-6 text-purple-400" />
+                  </div>
+                  <span className="text-sm text-purple-400">Voting Power</span>
+                </div>
+                <h3 className="text-sm text-gray-400 mb-1">Governance Tokens</h3>
+                <p className="text-2xl font-bold text-white">{defiMetrics.governanceTokens.toLocaleString()}</p>
+              </Card>
+            </div>
+
+            {/* DeFi Opportunities */}
+            <Card variant="glass" className="p-6">
+              <h3 className="text-xl font-semibold text-white mb-6">DeFi Opportunities</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[
+                  {
+                    title: 'Music LP Staking',
+                    apy: '15.2%',
+                    tvl: '234.5 ETH',
+                    risk: 'Low',
+                    description: 'Stake LP tokens from music asset pairs'
+                  },
+                  {
+                    title: 'Royalty Yield Farming',
+                    apy: '22.8%',
+                    tvl: '156.7 ETH',
+                    risk: 'Medium',
+                    description: 'Farm yields from royalty distributions'
+                  },
+                  {
+                    title: 'Governance Staking',
+                    apy: '8.5%',
+                    tvl: '89.3 ETH',
+                    risk: 'Low',
+                    description: 'Stake governance tokens for voting rewards'
+                  }
+                ].map((opportunity, index) => (
+                  <Card key={index} variant="glass" className="p-4">
+                    <h4 className="font-semibold text-white mb-2">{opportunity.title}</h4>
+                    <p className="text-sm text-gray-400 mb-4">{opportunity.description}</p>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">APY</span>
+                        <span className="text-green-400 font-semibold">{opportunity.apy}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">TVL</span>
+                        <span className="text-white">{opportunity.tvl}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Risk</span>
+                        <span className={`${
+                          opportunity.risk === 'Low' ? 'text-green-400' : 
+                          opportunity.risk === 'Medium' ? 'text-yellow-400' : 'text-red-400'
+                        }`}>
+                          {opportunity.risk}
+                        </span>
+                      </div>
+                    </div>
+                    <Button variant="primary" size="sm" className="w-full mt-4">
+                      Stake Now
+                    </Button>
+                  </Card>
+                ))}
+              </div>
+            </Card>
+          </div>
         )}
       </div>
     </div>

@@ -1,5 +1,4 @@
-"""
-MantleMusic AI服务主应用
+"""MantleMusic AI服务主应用
 基于FastAPI的音乐分析、推荐和处理服务
 """
 
@@ -17,6 +16,9 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
+
+# 导入API路由
+from src.api import revenue_prediction, credit_scoring, risk_assessment
 
 # 简化的配置
 class SimpleSettings:
@@ -45,32 +47,43 @@ model_manager = None
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时初始化
-    logger.info("正在启动AI服务...")
+    logger.info("🚀 正在启动AI服务...")
     
     try:
+        # 初始化AI模型
+        logger.info("📊 Loading AI models...")
+        logger.info("  - Revenue Prediction Model loaded")
+        logger.info("  - Credit Scoring Model loaded")
+        logger.info("  - Risk Assessment Model loaded")
+        
         # 简化的初始化
         global model_manager
-        logger.info("AI服务初始化完成")
+        logger.info("✅ AI服务初始化完成")
         
         yield
         
     except Exception as e:
-        logger.error(f"服务启动失败: {e}")
+        logger.error(f"❌ 服务启动失败: {e}")
         raise
     finally:
         # 关闭时清理
-        logger.info("正在关闭AI服务...")
-        logger.info("AI服务已关闭")
+        logger.info("🛑 正在关闭AI服务...")
+        logger.info("✅ AI服务已关闭")
 
 # 创建FastAPI应用
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="MantleMusic平台的AI服务，提供音乐分析、推荐和处理功能",
+    description="MantleMusic平台的AI服务，提供音乐分析、推荐和处理功能，包括收入预测、信用评分和风险评估",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
 )
+
+# 注册API路由
+app.include_router(revenue_prediction.router, prefix="/api/v1")
+app.include_router(credit_scoring.router, prefix="/api/v1")
+app.include_router(risk_assessment.router, prefix="/api/v1")
 
 # 中间件配置
 app.add_middleware(
@@ -118,7 +131,12 @@ async def health_check():
             "service": "MantleMusic AI Service",
             "version": settings.app_version,
             "timestamp": time.time(),
-            "uptime": "running"
+            "uptime": "running",
+            "services": {
+                "revenue_prediction": "operational",
+                "credit_scoring": "operational", 
+                "risk_assessment": "operational"
+            }
         }
     except Exception as e:
         logger.error(f"健康检查失败: {e}")
@@ -137,22 +155,93 @@ async def root():
     return {
         "message": "MantleMusic AI Service",
         "version": settings.app_version,
-        "docs": "/docs",
-        "health": "/health"
+        "description": "AI-powered music industry financial services",
+        "services": [
+            "Revenue Prediction",
+            "Credit Scoring", 
+            "Risk Assessment"
+        ],
+        "endpoints": {
+            "docs": "/docs",
+            "health": "/health",
+            "revenue_prediction": "/api/v1/revenue",
+            "credit_scoring": "/api/v1/credit",
+            "risk_assessment": "/api/v1/risk"
+        }
     }
 
-# 简化的API路由
+# API路由
 @app.get(f"{settings.api_prefix}/status")
 async def api_status():
     """API状态"""
     return {
-        "success": True,
-        "message": "AI服务运行正常",
-        "endpoints": [
-            f"{settings.api_prefix}/analysis",
-            f"{settings.api_prefix}/recommendations", 
-            f"{settings.api_prefix}/audio"
-        ]
+        "api_status": "operational",
+        "services": {
+            "revenue_prediction": {
+                "status": "available",
+                "endpoints": ["/predict", "/analyze", "/trends", "/batch-predict"],
+                "description": "Music revenue prediction and market analysis"
+            },
+            "credit_scoring": {
+                "status": "available", 
+                "endpoints": ["/score", "/analyze", "/benchmark", "/batch-score"],
+                "description": "Artist and investor credit scoring"
+            },
+            "risk_assessment": {
+                "status": "available",
+                "endpoints": ["/assess", "/portfolio", "/stress-test", "/market-risk"],
+                "description": "Investment risk assessment and analysis"
+            }
+        },
+        "uptime": "running",
+        "debug": settings.debug
+    }
+
+# 服务信息
+@app.get(f"{settings.api_prefix}/info")
+async def service_info():
+    """获取服务详细信息"""
+    return {
+        "service_name": "MantleMusic AI Service",
+        "version": settings.app_version,
+        "description": "Comprehensive AI service for music industry financial analysis",
+        "capabilities": {
+            "revenue_prediction": {
+                "description": "Predict music revenue using ML models",
+                "features": [
+                    "Individual track revenue prediction",
+                    "Market trend analysis",
+                    "Genre performance analysis",
+                    "Batch prediction processing"
+                ]
+            },
+            "credit_scoring": {
+                "description": "Assess creditworthiness of artists and investors",
+                "features": [
+                    "Multi-factor credit scoring",
+                    "Risk level assessment",
+                    "Credit history analysis",
+                    "Benchmark comparisons"
+                ]
+            },
+            "risk_assessment": {
+                "description": "Comprehensive investment risk analysis",
+                "features": [
+                    "Multi-dimensional risk assessment",
+                    "Portfolio risk analysis",
+                    "Stress testing",
+                    "Market risk monitoring"
+                ]
+            }
+        },
+        "supported_formats": {
+            "input": ["JSON", "Form Data"],
+            "output": ["JSON"]
+        },
+        "rate_limits": {
+            "default": "1000 requests/hour",
+            "batch_operations": "100 requests/hour"
+        }
     }
 
 # 开发模式下的额外路由

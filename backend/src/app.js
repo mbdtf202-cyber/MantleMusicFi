@@ -58,6 +58,11 @@ app.use('/api/music', musicRoutes);
 app.use('/api/contract', contractRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/artist', require('./routes/artist'));
+app.use('/api/defi', require('./routes/defi'));
+app.use('/api/oracle', require('./routes/oracle'));
+app.use('/api/privacy', require('./routes/privacy'));
+app.use('/api/governance', require('./routes/governance'));
 
 // 404 处理
 app.use('*', (req, res) => {

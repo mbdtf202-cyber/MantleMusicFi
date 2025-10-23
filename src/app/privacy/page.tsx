@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -17,408 +17,703 @@ import {
   FileCheck,
   UserCheck,
   Award,
-  Zap
+  Zap,
+  Clock,
+  X,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
+
+interface ZKVerification {
+  status: 'Unverified' | 'Pending' | 'Verified' | 'Rejected';
+  level: string | null;
+  expiryTime: number | null;
+  isValid: boolean;
+  verificationTime?: number;
+  verifier?: string;
+}
+
+interface SBTToken {
+  tokenId: number;
+  tokenType: string;
+  score: number;
+  isActive: boolean;
+  issuedTime: number;
+  expiryTime: number;
+  metadataURI: string;
+}
+
+interface ComplianceCheck {
+  compliant: boolean;
+  requirement: string;
+  failureReasons: string[];
+}
 
 const PrivacyPage = () => {
   const [showKYCModal, setShowKYCModal] = useState(false);
   const [showSBTModal, setShowSBTModal] = useState(false);
-  const [kycStatus, setKycStatus] = useState<'none' | 'pending' | 'verified' | 'rejected'>('none');
-  const [sbtStatus, setSbtStatus] = useState<'none' | 'minted' | 'pending'>('none');
+  const [showComplianceModal, setShowComplianceModal] = useState(false);
+  const [zkVerification, setZkVerification] = useState<ZKVerification | null>(null);
+  const [sbtTokens, setSbtTokens] = useState<SBTToken[]>([]);
+  const [complianceStatus, setComplianceStatus] = useState<ComplianceCheck[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [userAddress, setUserAddress] = useState('0x1234567890123456789012345678901234567890'); // Mock address
 
-  const privacyFeatures = [
-    {
-      title: 'ZK-KYC Verification',
-      description: 'Use zero-knowledge proof technology for identity verification, protecting user privacy while meeting compliance requirements',
-      icon: Shield,
-      color: '#3B82F6',
-      status: kycStatus,
-      action: () => setShowKYCModal(true)
-    },
-    {
-      title: 'SBT Identity Token',
-      description: 'Obtain non-transferable soul-bound tokens to prove your identity and reputation',
-      icon: Award,
-      color: '#8B5CF6',
-      status: sbtStatus,
-      action: () => setShowSBTModal(true)
-    },
-    {
-      title: 'Privacy Protection',
-      description: 'All personal data is encrypted to ensure user privacy and security',
-      icon: Lock,
-      color: '#10B981',
-      status: 'active',
-      action: () => {}
-    },
-    {
-      title: 'Compliance Monitoring',
-      description: 'Real-time monitoring of transaction compliance, automatic identification and prevention of risky behavior',
-      icon: Eye,
-      color: '#F59E0B',
-      status: 'active',
-      action: () => {}
-    }
-  ];
+  // KYC form data
+  const [kycForm, setKycForm] = useState({
+    level: 'Standard',
+    commitmentHash: '',
+    nullifierHash: '',
+    proofHash: ''
+  });
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'verified':
-      case 'minted':
-      case 'active':
-        return 'text-green-400';
-      case 'pending':
-        return 'text-yellow-400';
-      case 'rejected':
-        return 'text-red-400';
-      default:
-        return 'text-gray-400';
+  // Load user data on component mount
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    setLoading(true);
+    try {
+      // Load ZK verification status
+      const zkResponse = await fetch(`/api/privacy/zk-kyc/status/${userAddress}`);
+      const zkData = await zkResponse.json();
+      if (zkData.success) {
+        setZkVerification(zkData.data);
+      }
+
+      // Load SBT tokens
+      const sbtResponse = await fetch(`/api/privacy/sbt/user/${userAddress}`);
+      const sbtData = await sbtResponse.json();
+      if (sbtData.success) {
+        setSbtTokens(sbtData.data.tokens);
+      }
+
+      // Load compliance status for common requirements
+      const requirements = ['invest', 'accredited_invest'];
+      const compliancePromises = requirements.map(async (req) => {
+        const response = await fetch(`/api/privacy/compliance/check/${userAddress}?requirement=${req}`);
+        const data = await response.json();
+        return data.success ? data.data : null;
+      });
+      
+      const complianceResults = await Promise.all(compliancePromises);
+      setComplianceStatus(complianceResults.filter(Boolean));
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusText = (status: string, type: string) => {
-    if (type === 'kyc') {
-      switch (status) {
-        case 'verified': return 'Verified';
-        case 'pending': return 'Under Review';
-        case 'rejected': return 'Rejected';
-        default: return 'Not Verified';
+  const submitKYC = async () => {
+    if (!kycForm.commitmentHash || !kycForm.nullifierHash || !kycForm.proofHash) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/privacy/zk-kyc/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          address: userAddress,
+          ...kycForm
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        alert('ZK-KYC verification submitted successfully!');
+        setShowKYCModal(false);
+        loadUserData(); // Refresh data
+      } else {
+        alert(data.message || 'Submission failed');
       }
-    } else if (type === 'sbt') {
-      switch (status) {
-        case 'minted': return 'Minted';
-        case 'pending': return 'Minting';
-        default: return 'Not Minted';
-      }
-    } else {
-      return 'Active';
+    } catch (error) {
+      console.error('KYC submission error:', error);
+      alert('Submission failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const generateMockProof = () => {
+    setKycForm({
+      ...kycForm,
+      commitmentHash: `0x${Math.random().toString(16).substr(2, 64)}`,
+      nullifierHash: `0x${Math.random().toString(16).substr(2, 64)}`,
+      proofHash: `0x${Math.random().toString(16).substr(2, 64)}`
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'Verified': return '#10B981';
+      case 'Pending': return '#F59E0B';
+      case 'Rejected': return '#EF4444';
+      default: return '#6B7280';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'verified':
-      case 'minted':
-      case 'active':
-        return CheckCircle;
-      case 'pending':
-        return AlertTriangle;
-      case 'rejected':
-        return AlertTriangle;
-      default:
-        return Shield;
+      case 'Verified': return CheckCircle;
+      case 'Pending': return Clock;
+      case 'Rejected': return X;
+      default: return AlertTriangle;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
-      <div className="cyber-grid opacity-20" />
-      
-      <div className="relative z-10 container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-violet-900 p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-8"
+          className="text-center mb-12"
         >
-          <h1 className="text-4xl font-bold text-white mb-2">
+          <h1 className="text-4xl font-bold text-white mb-4">
             Privacy & Compliance Center
           </h1>
-          <p className="text-gray-300">
-            Protect your privacy and ensure platform compliance
+          <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+            Secure your identity with zero-knowledge proofs and soulbound tokens while maintaining full privacy
           </p>
         </motion.div>
 
-        {/* Privacy Status Overview */}
+        {/* User Status Overview */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.1 }}
+          transition={{ delay: 0.1 }}
           className="mb-8"
         >
           <Card variant="glass" className="p-6">
-            <h2 className="text-2xl font-bold text-white mb-6">Privacy Status Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Shield className="w-8 h-8 text-blue-400" />
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Your Privacy Status</h2>
+              <Button
+                variant="outline"
+                onClick={loadUserData}
+                disabled={loading}
+                className="text-sm"
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* ZK-KYC Status */}
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Shield className="w-5 h-5 text-blue-400" />
+                    <span className="font-semibold text-white">ZK-KYC</span>
+                  </div>
+                  {zkVerification && (
+                    <div className="flex items-center space-x-1">
+                      {React.createElement(getStatusIcon(zkVerification.status), {
+                        className: "w-4 h-4",
+                        style: { color: getStatusColor(zkVerification.status) }
+                      })}
+                      <span 
+                        className="text-sm font-medium"
+                        style={{ color: getStatusColor(zkVerification.status) }}
+                      >
+                        {zkVerification.status}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
-                  {kycStatus === 'verified' ? 'Verified' : 'Not Verified'}
-                </div>
-                <div className="text-sm text-gray-400">KYC Status</div>
+                <p className="text-gray-400 text-sm mb-3">
+                  {zkVerification?.status === 'Verified' 
+                    ? `Level: ${zkVerification.level}` 
+                    : 'Complete identity verification'}
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setShowKYCModal(true)}
+                  disabled={zkVerification?.status === 'Verified'}
+                  className="w-full"
+                >
+                  {zkVerification?.status === 'Verified' ? 'Verified' : 'Start KYC'}
+                </Button>
               </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Award className="w-8 h-8 text-purple-400" />
+
+              {/* SBT Tokens */}
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Award className="w-5 h-5 text-purple-400" />
+                    <span className="font-semibold text-white">SBT Tokens</span>
+                  </div>
+                  <span className="text-purple-400 font-bold">{sbtTokens.length}</span>
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">
-                  {sbtStatus === 'minted' ? 'Obtained' : 'Not Obtained'}
-                </div>
-                <div className="text-sm text-gray-400">SBT Token</div>
+                <p className="text-gray-400 text-sm mb-3">
+                  {sbtTokens.length > 0 
+                    ? `${sbtTokens.filter(t => t.isActive).length} active tokens`
+                    : 'No tokens issued yet'}
+                </p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowSBTModal(true)}
+                  className="w-full"
+                >
+                  View Tokens
+                </Button>
               </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Lock className="w-8 h-8 text-green-400" />
+
+              {/* Compliance Status */}
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <FileCheck className="w-5 h-5 text-green-400" />
+                    <span className="font-semibold text-white">Compliance</span>
+                  </div>
+                  <span className="text-green-400 font-bold">
+                    {complianceStatus.filter(c => c.compliant).length}/{complianceStatus.length}
+                  </span>
                 </div>
-                <div className="text-2xl font-bold text-white mb-1">100%</div>
-                <div className="text-sm text-gray-400">Data Encryption</div>
-              </div>
-              <div className="text-center">
-                <div className="w-16 h-16 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Eye className="w-8 h-8 text-orange-400" />
-                </div>
-                <div className="text-2xl font-bold text-white mb-1">Real-time</div>
-                <div className="text-sm text-gray-400">Compliance Monitoring</div>
+                <p className="text-gray-400 text-sm mb-3">
+                  {complianceStatus.filter(c => c.compliant).length === complianceStatus.length
+                    ? 'All requirements met'
+                    : 'Some requirements pending'}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowComplianceModal(true)}
+                  className="w-full"
+                >
+                  Check Status
+                </Button>
               </div>
             </div>
           </Card>
         </motion.div>
 
-        {/* Privacy Features */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
-          className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8"
-        >
-          {privacyFeatures.map((feature, index) => {
-            const StatusIcon = getStatusIcon(feature.status);
-            const statusType = feature.title.includes('KYC') ? 'kyc' : 
-                              feature.title.includes('SBT') ? 'sbt' : 'other';
-            
-            return (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-              >
-                <Card variant="glass" className="p-6 h-full">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-4">
-                      <div 
-                        className="p-3 rounded-lg"
-                        style={{ backgroundColor: `${feature.color}20` }}
-                      >
-                        <feature.icon 
-                          className="w-6 h-6" 
-                          style={{ color: feature.color }}
-                        />
+        {/* Privacy Features Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* ZK-KYC Feature */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card variant="glass" className="p-6 h-full">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-3 bg-blue-500/20 rounded-lg">
+                  <Shield className="w-6 h-6 text-blue-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">ZK-KYC Verification</h3>
+              </div>
+              <p className="text-gray-300 mb-6">
+                Use zero-knowledge proof technology for identity verification, protecting user privacy while meeting compliance requirements.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>Privacy-preserving verification</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>Multiple compliance levels</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>Cryptographic proof generation</span>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* SBT Feature */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card variant="glass" className="p-6 h-full">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-3 bg-purple-500/20 rounded-lg">
+                  <Award className="w-6 h-6 text-purple-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Soulbound Tokens</h3>
+              </div>
+              <p className="text-gray-300 mb-6">
+                Obtain non-transferable soul-bound tokens to prove your identity, reputation, and achievements on-chain.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>Non-transferable identity</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>Reputation scoring</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>Achievement tracking</span>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Privacy Protection Feature */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card variant="glass" className="p-6 h-full">
+              <div className="flex items-center space-x-3 mb-4">
+                <div className="p-3 bg-green-500/20 rounded-lg">
+                  <Lock className="w-6 h-6 text-green-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Privacy Protection</h3>
+              </div>
+              <p className="text-gray-300 mb-6">
+                All personal data is encrypted and protected using advanced cryptographic techniques to ensure maximum privacy.
+              </p>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>End-to-end encryption</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>Zero-knowledge architecture</span>
+                </div>
+                <div className="flex items-center space-x-2 text-sm text-gray-400">
+                  <CheckCircle className="w-4 h-4 text-green-400" />
+                  <span>GDPR compliant</span>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        </div>
+
+        {/* SBT Tokens Display */}
+        {sbtTokens.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="mb-8"
+          >
+            <Card variant="glass" className="p-6">
+              <h2 className="text-2xl font-bold text-white mb-6">Your Soulbound Tokens</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sbtTokens.map((token) => (
+                  <div key={token.tokenId} className="bg-gray-800/50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-semibold text-white">#{token.tokenId}</span>
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        token.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {token.isActive ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Type:</span>
+                        <span className="text-white">{token.tokenType}</span>
                       </div>
-                      <div>
-                        <h3 className="text-xl font-semibold text-white">
-                          {feature.title}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <StatusIcon className={`w-4 h-4 ${getStatusColor(feature.status)}`} />
-                          <span className={`text-sm ${getStatusColor(feature.status)}`}>
-                            {getStatusText(feature.status, statusType)}
-                          </span>
-                        </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Score:</span>
+                        <span className="text-purple-400 font-bold">{token.score}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Issued:</span>
+                        <span className="text-white">
+                          {new Date(token.issuedTime).toLocaleDateString()}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  
-                  <p className="text-gray-300 mb-6">
-                    {feature.description}
-                  </p>
-                  
-                  {(statusType === 'kyc' || statusType === 'sbt') && (
-                    <Button
-                      variant="outline"
-                      onClick={feature.action}
-                      className="w-full"
-                    >
-                      {statusType === 'kyc' ? 
-                        (kycStatus === 'none' ? 'Start Verification' : 'View Status') :
-                        (sbtStatus === 'none' ? 'Mint SBT' : 'View Token')
-                      }
-                    </Button>
-                  )}
-                </Card>
-              </motion.div>
-            );
-          })}
-        </motion.div>
+                ))}
+              </div>
+            </Card>
+          </motion.div>
+        )}
 
-        {/* Privacy Guidelines */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-        >
-          <Card variant="glass" className="p-6">
-            <h3 className="text-xl font-semibold text-white mb-4">Privacy Protection Guide</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Compliance Status Display */}
+        {complianceStatus.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <Card variant="glass" className="p-6">
+              <h2 className="text-2xl font-bold text-white mb-6">Compliance Status</h2>
               <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <Key className="w-5 h-5 text-blue-400 mt-1" />
-                  <div>
-                    <h4 className="font-medium text-white">Private Key Security</h4>
-                    <p className="text-sm text-gray-400">
-                      Keep your private keys safe and never share them with anyone
-                    </p>
+                {complianceStatus.map((status, index) => (
+                  <div key={index} className="bg-gray-800/50 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-white capitalize">
+                        {status.requirement.replace('_', ' ')}
+                      </span>
+                      <div className="flex items-center space-x-2">
+                        {status.compliant ? (
+                          <CheckCircle className="w-5 h-5 text-green-400" />
+                        ) : (
+                          <X className="w-5 h-5 text-red-400" />
+                        )}
+                        <span className={`font-medium ${
+                          status.compliant ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {status.compliant ? 'Compliant' : 'Non-compliant'}
+                        </span>
+                      </div>
+                    </div>
+                    {!status.compliant && status.failureReasons.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-400 mb-1">Requirements:</p>
+                        <ul className="text-sm text-red-400 space-y-1">
+                          {status.failureReasons.map((reason, idx) => (
+                            <li key={idx} className="flex items-center space-x-2">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span>{reason}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FileCheck className="w-5 h-5 text-green-400 mt-1" />
-                  <div>
-                    <h4 className="font-medium text-white">Data Minimization</h4>
-                    <p className="text-sm text-gray-400">
-                      We only collect necessary data and regularly delete expired information
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <UserCheck className="w-5 h-5 text-purple-400 mt-1" />
-                  <div>
-                    <h4 className="font-medium text-white">Identity Verification</h4>
-                    <p className="text-sm text-gray-400">
-                      Use zero-knowledge proof technology to protect your identity privacy
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Zap className="w-5 h-5 text-orange-400 mt-1" />
-                  <div>
-                    <h4 className="font-medium text-white">Real-time Monitoring</h4>
-                    <p className="text-sm text-gray-400">
-                      24/7 monitoring of suspicious activities to protect your asset security
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </motion.div>
+            </Card>
+          </motion.div>
+        )}
       </div>
 
-      {/* KYC Modal */}
-      <Modal
-        isOpen={showKYCModal}
-        onClose={() => setShowKYCModal(false)}
-        title="ZK-KYC Identity Verification"
-        size="lg"
-      >
-        <div className="space-y-6">
-          <div className="text-center">
-            <Shield className="w-16 h-16 text-blue-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">
-              Zero-Knowledge Identity Verification
-            </h3>
-            <p className="text-gray-400">
-              Use advanced zero-knowledge proof technology to complete identity verification without revealing personal information
-            </p>
+      {/* ZK-KYC Modal */}
+      <Modal isOpen={showKYCModal} onClose={() => setShowKYCModal(false)}>
+        <div className="p-6">
+          <h2 className="text-2xl font-bold text-white mb-6">ZK-KYC Verification</h2>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Compliance Level
+              </label>
+              <select
+                value={kycForm.level}
+                onChange={(e) => setKycForm({ ...kycForm, level: e.target.value })}
+                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Basic">Basic</option>
+                <option value="Standard">Standard</option>
+                <option value="Enhanced">Enhanced</option>
+                <option value="Institutional">Institutional</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Commitment Hash
+              </label>
+              <Input
+                value={kycForm.commitmentHash}
+                onChange={(e) => setKycForm({ ...kycForm, commitmentHash: e.target.value })}
+                placeholder="0x..."
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Nullifier Hash
+              </label>
+              <Input
+                value={kycForm.nullifierHash}
+                onChange={(e) => setKycForm({ ...kycForm, nullifierHash: e.target.value })}
+                placeholder="0x..."
+                className="w-full"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Proof Hash
+              </label>
+              <Input
+                value={kycForm.proofHash}
+                onChange={(e) => setKycForm({ ...kycForm, proofHash: e.target.value })}
+                placeholder="0x..."
+                className="w-full"
+              />
+            </div>
+
+            <Button
+              variant="outline"
+              onClick={generateMockProof}
+              className="w-full mb-4"
+            >
+              Generate Mock Proof (Demo)
+            </Button>
+
+            <div className="flex space-x-3">
+              <Button
+                variant="primary"
+                onClick={submitKYC}
+                disabled={loading}
+                className="flex-1"
+              >
+                {loading ? 'Submitting...' : 'Submit Verification'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowKYCModal(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-          
-          {kycStatus === 'none' && (
-            <div className="space-y-4">
-              <Input label="ID Document Type" placeholder="Select document type..." />
-              <Input label="Document Number" placeholder="Enter document number..." />
-              <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setShowKYCModal(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  variant="primary"
-                  onClick={() => {
-                    setKycStatus('pending');
-                    setShowKYCModal(false);
-                  }}
-                >
-                  Start Verification
-                </Button>
-              </div>
-            </div>
-          )}
-          
-          {kycStatus === 'pending' && (
-            <div className="text-center">
-              <AlertTriangle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-              <p className="text-white mb-4">Your identity verification is under review...</p>
-              <Button variant="outline" onClick={() => setShowKYCModal(false)}>
-                Close
-              </Button>
-            </div>
-          )}
-          
-          {kycStatus === 'verified' && (
-            <div className="text-center">
-              <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-              <p className="text-white mb-4">Identity verification completed!</p>
-              <Button variant="primary" onClick={() => setShowKYCModal(false)}>
-                Complete
-              </Button>
-            </div>
-          )}
         </div>
       </Modal>
 
       {/* SBT Modal */}
-      <Modal
-        isOpen={showSBTModal}
-        onClose={() => setShowSBTModal(false)}
-        title="SBT Identity Token"
-        size="lg"
-      >
-        <div className="space-y-6">
-          <div className="text-center">
-            <Award className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">
-              Soul Bound Token
-            </h3>
-            <p className="text-gray-400">
-              Obtain non-transferable identity tokens to prove your reputation and contributions on the platform
-            </p>
-          </div>
+      <Modal isOpen={showSBTModal} onClose={() => setShowSBTModal(false)}>
+        <div className="p-6">
+          <h2 className="text-2xl font-bold text-white mb-6">Soulbound Tokens</h2>
           
-          {sbtStatus === 'none' && (
+          {sbtTokens.length === 0 ? (
+            <div className="text-center py-8">
+              <Award className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-400">No SBT tokens issued yet</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Complete KYC verification to receive your first identity token
+              </p>
+            </div>
+          ) : (
             <div className="space-y-4">
-              <div className="bg-gray-800/50 p-4 rounded-lg">
-                <h4 className="font-medium text-white mb-2">SBT Features</h4>
-                <ul className="text-sm text-gray-400 space-y-1">
-                  <li>• Non-transferable, permanently bound to your address</li>
-                  <li>• Records your platform contributions and reputation</li>
-                  <li>• Unlocks special features and benefits</li>
-                  <li>• Participate in advanced governance voting</li>
-                </ul>
-              </div>
-              <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setShowSBTModal(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  variant="primary"
-                  onClick={() => {
-                    setSbtStatus('pending');
-                    setTimeout(() => setSbtStatus('minted'), 2000);
-                  }}
-                >
-                  Mint SBT
-                </Button>
-              </div>
+              {sbtTokens.map((token) => (
+                <div key={token.tokenId} className="bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-white">Token #{token.tokenId}</h3>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      token.isActive ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                    }`}>
+                      {token.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-400">Type:</span>
+                      <p className="text-white font-medium">{token.tokenType}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Score:</span>
+                      <p className="text-purple-400 font-bold">{token.score}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Issued:</span>
+                      <p className="text-white">{new Date(token.issuedTime).toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Expires:</span>
+                      <p className="text-white">
+                        {token.expiryTime === 0 ? 'Never' : new Date(token.expiryTime).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3 pt-3 border-t border-gray-700">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(token.metadataURI, '_blank')}
+                      className="w-full"
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View Metadata
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
           
-          {sbtStatus === 'pending' && (
-            <div className="text-center">
-              <div className="spinner mx-auto mb-4" />
-              <p className="text-white mb-4">Minting your SBT token...</p>
+          <div className="mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShowSBTModal(false)}
+              className="w-full"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Compliance Modal */}
+      <Modal isOpen={showComplianceModal} onClose={() => setShowComplianceModal(false)}>
+        <div className="p-6">
+          <h2 className="text-2xl font-bold text-white mb-6">Compliance Status</h2>
+          
+          {complianceStatus.length === 0 ? (
+            <div className="text-center py-8">
+              <FileCheck className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-400">No compliance requirements found</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {complianceStatus.map((status, index) => (
+                <div key={index} className="bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-semibold text-white capitalize">
+                      {status.requirement.replace('_', ' ')}
+                    </h3>
+                    <div className="flex items-center space-x-2">
+                      {status.compliant ? (
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <X className="w-5 h-5 text-red-400" />
+                      )}
+                      <span className={`font-medium ${
+                        status.compliant ? 'text-green-400' : 'text-red-400'
+                      }`}>
+                        {status.compliant ? 'Compliant' : 'Non-compliant'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {!status.compliant && status.failureReasons.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-400 mb-2">Missing requirements:</p>
+                      <ul className="space-y-1">
+                        {status.failureReasons.map((reason, idx) => (
+                          <li key={idx} className="flex items-center space-x-2 text-sm text-red-400">
+                            <AlertTriangle className="w-3 h-3" />
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
           
-          {sbtStatus === 'minted' && (
-            <div className="text-center">
-              <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-              <p className="text-white mb-4">SBT token minted successfully!</p>
-              <Button variant="primary" onClick={() => setShowSBTModal(false)}>
-                View Token
-              </Button>
-            </div>
-          )}
+          <div className="mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShowComplianceModal(false)}
+              className="w-full"
+            >
+              Close
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
