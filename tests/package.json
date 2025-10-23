@@ -1,0 +1,25 @@
+{
+  "name": "mantlemusic-tests",
+  "version": "1.0.0",
+  "description": "MantleMusic 测试套件",
+  "scripts": {
+    "test": "mocha --recursive --timeout 30000",
+    "test:integration": "mocha integration/*.test.js --timeout 30000",
+    "test:e2e": "mocha e2e/*.test.js --timeout 60000",
+    "test:unit": "mocha unit/*.test.js --timeout 10000",
+    "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:watch": "mocha --recursive --watch --timeout 30000",
+    "test:coverage": "nyc mocha --recursive --timeout 30000"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0",
+    "nyc": "^15.1.0",
+    "supertest": "^6.3.3"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.6",
+    "@types/mocha": "^10.0.2"
+  }
+}
