@@ -175,7 +175,7 @@ export class GovernanceService {
       if (status) params.append('status', status);
       if (category) params.append('category', category);
       
-      const url = `${API_BASE_URL}${API_ENDPOINTS.governance.proposals}${params.toString() ? `?${params.toString()}` : ''}`;
+      const url = `${API_BASE_URL}${API_ENDPOINTS.GOVERNANCE.PROPOSALS}${params.toString() ? `?${params.toString()}` : ''}`;
       
       const response = await fetch(url, {
         method: 'GET',
@@ -207,7 +207,7 @@ export class GovernanceService {
   // 获取单个提案详情
   static async getProposal(proposalId: string): Promise<Proposal | null> {
     try {
-      const url = replaceUrlParams(API_ENDPOINTS.governance.proposalDetail, { proposalId });
+      const url = replaceUrlParams(API_ENDPOINTS.GOVERNANCE.PROPOSAL_DETAIL, { proposalId });
       
       const response = await fetch(`${API_BASE_URL}${url}`, {
         method: 'GET',
@@ -232,7 +232,7 @@ export class GovernanceService {
   // 创建提案
   static async createProposal(proposalData: CreateProposalData): Promise<{ success: boolean; proposalId?: string; message?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.governance.createProposal}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GOVERNANCE.CREATE_PROPOSAL}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -265,7 +265,7 @@ export class GovernanceService {
   // 投票
   static async vote(voteData: VoteData): Promise<{ success: boolean; message?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.governance.vote}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GOVERNANCE.VOTE}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -296,7 +296,7 @@ export class GovernanceService {
   // 委托投票权
   static async delegate(delegateData: DelegateData): Promise<{ success: boolean; message?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.governance.delegate}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GOVERNANCE.DELEGATE}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,7 +327,7 @@ export class GovernanceService {
   // 撤销委托
   static async undelegate(): Promise<{ success: boolean; message?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.governance.undelegate}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GOVERNANCE.REVOKE_DELEGATION}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -357,7 +357,7 @@ export class GovernanceService {
   // 执行提案
   static async executeProposal(proposalId: string): Promise<{ success: boolean; message?: string }> {
     try {
-      const url = replaceUrlParams(API_ENDPOINTS.governance.executeProposal, { proposalId });
+      const url = replaceUrlParams(API_ENDPOINTS.GOVERNANCE.EXECUTE_PROPOSAL, { proposalId });
       
       const response = await fetch(`${API_BASE_URL}${url}`, {
         method: 'POST',
@@ -389,7 +389,7 @@ export class GovernanceService {
   // 取消提案
   static async cancelProposal(proposalId: string): Promise<{ success: boolean; message?: string }> {
     try {
-      const url = replaceUrlParams(API_ENDPOINTS.governance.cancelProposal, { proposalId });
+      const url = replaceUrlParams(API_ENDPOINTS.GOVERNANCE.CANCEL_PROPOSAL, { proposalId });
       
       const response = await fetch(`${API_BASE_URL}${url}`, {
         method: 'POST',
@@ -421,7 +421,7 @@ export class GovernanceService {
   // 获取治理统计数据
   static async getGovernanceStats(): Promise<GovernanceStats> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.governance.stats}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GOVERNANCE.STATS}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -444,7 +444,7 @@ export class GovernanceService {
   // 获取用户投票数据
   static async getUserVotingData(): Promise<UserVotingData> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.governance.userVotingPower}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GOVERNANCE.VOTING_POWER}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -468,7 +468,7 @@ export class GovernanceService {
   // 获取用户投票历史
   static async getUserVotingHistory(): Promise<VoteRecord[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.governance.userVotingPower}/history`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.GOVERNANCE.VOTING_POWER}/history`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

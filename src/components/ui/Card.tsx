@@ -60,4 +60,50 @@ const Card: React.FC<CardProps> = ({
   );
 };
 
+// Card子组件
+interface CardHeaderProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export const CardHeader: React.FC<CardHeaderProps> = ({ children, className }) => (
+  <div className={clsx('flex flex-col space-y-1.5 p-6', className)}>
+    {children}
+  </div>
+);
+
+interface CardTitleProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export const CardTitle: React.FC<CardTitleProps> = ({ children, className }) => (
+  <h3 className={clsx('text-2xl font-semibold leading-none tracking-tight', className)}>
+    {children}
+  </h3>
+);
+
+interface CardDescriptionProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export const CardDescription: React.FC<CardDescriptionProps> = ({ children, className }) => (
+  <p className={clsx('text-sm text-gray-600 dark:text-gray-400', className)}>
+    {children}
+  </p>
+);
+
+interface CardContentProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+export const CardContent: React.FC<CardContentProps> = ({ children, className }) => (
+  <div className={clsx('p-6 pt-0', className)}>
+    {children}
+  </div>
+);
+
+export { Card };
 export default Card;

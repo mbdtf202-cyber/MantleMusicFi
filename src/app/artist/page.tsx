@@ -20,9 +20,9 @@ import {
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Modal from '@/components/ui/Modal';
-import { artistService, Track, ArtistStats, UploadTrackData } from '@/services/artistService';
+import { artistService, Track as ServiceTrack, ArtistStats, UploadTrackData } from '@/services/artistService';
 
-interface Track {
+interface LocalTrack {
   id: string;
   title: string;
   artist: string;
@@ -38,7 +38,7 @@ const ArtistPortal: React.FC = () => {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const [tracks, setTracks] = useState<LocalTrack[]>([]);
   const [stats, setStats] = useState<ArtistStats | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
@@ -215,7 +215,7 @@ const ArtistPortal: React.FC = () => {
     { id: 'analytics', label: 'Analytics', icon: FileText },
   ];
 
-  const getStatusColor = (status: Track['status']) => {
+  const getStatusColor = (status: LocalTrack['status']) => {
     switch (status) {
       case 'approved': return 'text-green-400 bg-green-400/20';
       case 'pending': return 'text-yellow-400 bg-yellow-400/20';
@@ -224,7 +224,7 @@ const ArtistPortal: React.FC = () => {
     }
   };
 
-  const getStatusText = (status: Track['status']) => {
+  const getStatusText = (status: LocalTrack['status']) => {
     switch (status) {
       case 'approved': return 'Approved';
       case 'pending': return 'Pending';
@@ -675,7 +675,7 @@ const ArtistPortal: React.FC = () => {
             <Card variant="glass">
               <h4 className="text-lg font-semibold text-white mb-4">Track Performance Ranking</h4>
               <div className="space-y-4">
-                {mockTracks.filter(track => track.revenue).map((track, index) => (
+                {tracks.filter(track => track.revenue).map((track, index) => (
                   <div key={track.id} className="flex items-center justify-between p-4 bg-gray-800/30 rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div className="w-8 h-8 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-full flex items-center justify-center text-white font-bold text-sm">

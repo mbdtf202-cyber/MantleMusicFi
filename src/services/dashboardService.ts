@@ -108,7 +108,7 @@ export class DashboardService {
   async getPortfolioData(userId: string): Promise<Investment[]> {
     try {
       const response = await fetch(
-        replaceUrlParams(API_ENDPOINTS.user.portfolio, { userId }),
+        replaceUrlParams(API_ENDPOINTS.INVESTOR.PORTFOLIO, { userId }),
         {
           method: 'GET',
           headers: getAuthHeaders(),
@@ -210,7 +210,7 @@ export class DashboardService {
   // 投资音乐资产
   async investInTrack(trackId: string, amount: number): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     try {
-      const response = await fetch(API_ENDPOINTS.music.invest, {
+      const response = await fetch(API_ENDPOINTS.INVESTOR.INVEST, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
@@ -235,7 +235,7 @@ export class DashboardService {
   async sellInvestment(investmentId: string, amount: number): Promise<{ success: boolean; transactionId?: string; error?: string }> {
     try {
       const response = await fetch(
-        replaceUrlParams(API_ENDPOINTS.user.sellInvestment, { investmentId }),
+        replaceUrlParams(API_ENDPOINTS.INVESTOR.SELL, { investmentId }),
         {
           method: 'POST',
           headers: getAuthHeaders(),

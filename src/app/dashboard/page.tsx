@@ -110,7 +110,7 @@ const InvestorDashboard: React.FC = () => {
       // 并行获取所有数据
       const [dashboardData, portfolioHistory] = await Promise.all([
         DashboardService.getDashboardData(userId),
-        DashboardService.getPortfolioHistory(userId, '30d')
+        DashboardService.getPortfolioHistory(userId)
       ]);
 
       // 更新状态

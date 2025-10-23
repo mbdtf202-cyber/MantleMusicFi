@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  # MongoDB 数据库
+  mongodb:
+    image: mongo:7.0
+    container_name: mantlemusic-mongodb-local
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: mantlemusic
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - mantlemusic-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7.2-alpine
+    container_name: mantlemusic-redis-local
+    restart: unless-stopped
+    command: redis-server --requirepass password123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mantlemusic-network
+
+  # 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mantlemusic-backend-local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/mantlemusic?authSource=admin
+      REDIS_URL: redis://:password123@redis:6379
+      JWT_SECRET: your-super-secret-jwt-key-local
+      JWT_REFRESH_SECRET: your-super-secret-refresh-key-local
+      CORS_ORIGIN: http://localhost:3000
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - mantlemusic-network
+
+  # AI 服务
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: mantlemusic-ai-local
+    restart: unless-stopped
+    environment:
+      FLASK_ENV: production
+      MONGODB_URI: mongodb://admin:password123@mongodb:27017/mantlemusic?authSource=admin
+      REDIS_URL: redis://:password123@redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-demo-key}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-demo-key}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./ai-service:/app
+    networks:
+      - mantlemusic-network
+
+  # 前端服务
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mantlemusic-frontend-local
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:5000/api
+      NEXT_PUBLIC_AI_SERVICE_URL: http://localhost:8000
+      NEXT_PUBLIC_CHAIN_ID: 5000
+      NEXT_PUBLIC_RPC_URL: https://rpc.mantle.xyz
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+      - ai-service
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - mantlemusic-network
+
+  # Nginx 反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: mantlemusic-nginx-local
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+      - ai-service
+    networks:
+      - mantlemusic-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  mantlemusic-network:
+    driver: bridge

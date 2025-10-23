@@ -94,7 +94,7 @@ class DeFiService {
   // AMM 相关方法
   async getTradingPairs(): Promise<{ pairs: TradingPair[] }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.amm.pairs}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.AMM_PAIRS}`, {
         headers: getAuthHeaders(),
       });
       
@@ -154,7 +154,7 @@ class DeFiService {
 
   async getSwapQuote(tokenIn: string, tokenOut: string, amountIn: string): Promise<SwapQuote> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.amm.quote}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.AMM_QUOTE}`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
@@ -184,7 +184,7 @@ class DeFiService {
 
   async executeSwap(tokenIn: string, tokenOut: string, amountIn: string, slippage: number): Promise<{ success: boolean; txHash?: string; message?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.amm.swap}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.AMM_SWAP}`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
@@ -212,7 +212,7 @@ class DeFiService {
   // 流动性相关方法
   async getLiquidityPools(): Promise<{ pools: LiquidityPool[] }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.amm.liquidity}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.AMM_ADD_LIQUIDITY}`, {
         headers: getAuthHeaders(),
       });
       
@@ -258,7 +258,7 @@ class DeFiService {
 
   async addLiquidity(token0: string, token1: string, amount0: string, amount1: string): Promise<{ success: boolean; txHash?: string; message?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.amm.addLiquidity}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.AMM_ADD_LIQUIDITY}`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
@@ -285,7 +285,7 @@ class DeFiService {
   // 借贷相关方法
   async getLendingPools(): Promise<{ pools: LendingPool[] }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.lending.pools}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.LENDING_POOLS}`, {
         headers: getAuthHeaders(),
       });
       
@@ -331,7 +331,7 @@ class DeFiService {
 
   async supply(asset: string, amount: string): Promise<{ success: boolean; txHash?: string; message?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.lending.supply}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.LENDING_SUPPLY}`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
@@ -357,7 +357,7 @@ class DeFiService {
 
   async borrow(asset: string, amount: string): Promise<{ success: boolean; txHash?: string; message?: string }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.lending.borrow}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.LENDING_BORROW}`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
@@ -384,7 +384,7 @@ class DeFiService {
   // 收益农场相关方法
   async getYieldFarms(): Promise<{ farms: YieldFarm[] }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.yield.strategies}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.YIELD_STRATEGIES}`, {
         headers: getAuthHeaders(),
       });
       
@@ -430,7 +430,7 @@ class DeFiService {
 
   async stakeLp(farmId: string, amount: string): Promise<{ success: boolean; txHash?: string; message?: string }> {
     try {
-      const response = await fetch(replaceUrlParams(API_ENDPOINTS.defi.yield.stake, { farmId }), {
+      const response = await fetch(replaceUrlParams(API_ENDPOINTS.DEFI.YIELD_DEPOSIT, { farmId }), {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
@@ -456,7 +456,7 @@ class DeFiService {
 
   async claimRewards(farmId: string): Promise<{ success: boolean; txHash?: string; message?: string }> {
     try {
-      const response = await fetch(replaceUrlParams(API_ENDPOINTS.defi.yield.claim, { farmId }), {
+      const response = await fetch(replaceUrlParams(API_ENDPOINTS.DEFI.YIELD_HARVEST, { farmId }), {
         method: 'POST',
         headers: getAuthHeaders(),
       });
@@ -479,7 +479,7 @@ class DeFiService {
   // 交易历史
   async getTransactionHistory(): Promise<{ transactions: Transaction[] }> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.transactions}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.DEFI.TRANSACTIONS}`, {
         headers: getAuthHeaders(),
       });
       
@@ -524,7 +524,7 @@ class DeFiService {
   // DeFi 统计数据
   async getDeFiStats(): Promise<DeFiStats> {
     try {
-      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.defi.stats}`, {
+      const response = await fetch(`${API_BASE_URL}${API_ENDPOINTS.ANALYTICS.DEFI_METRICS}`, {
         headers: getAuthHeaders(),
       });
       

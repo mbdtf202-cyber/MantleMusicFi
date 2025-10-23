@@ -154,7 +154,7 @@ const AdvancedChart: React.FC<ChartProps> = ({
     const stepX = width / (data.length - 1);
 
     // Create gradient if enabled
-    let strokeStyle = color;
+    let strokeStyle: string | CanvasGradient = color;
     if (gradient) {
       const grad = ctx.createLinearGradient(0, padding, 0, padding + height);
       grad.addColorStop(0, color);

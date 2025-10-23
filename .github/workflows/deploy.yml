@@ -1,0 +1,198 @@
+name: Deploy MantleMusicFi to Cloud
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd backend && npm ci
+        cd ../ai-service && pip install -r requirements.txt
+        
+    - name: Run frontend tests
+      run: npm test -- --passWithNoTests
+      
+    - name: Run backend tests
+      run: |
+        cd backend
+        npm test
+        
+    - name: Run contract tests
+      run: |
+        npx hardhat test
+        
+    - name: Lint code
+      run: |
+        npm run lint
+        cd backend && npm run lint
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        
+    - name: Build and push Frontend image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.frontend
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build and push Backend image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.backend
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Build and push AI Service image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.ai
+        push: true
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-ai:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+        
+    - name: Deploy to server
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          # 进入项目目录
+          cd /opt/mantlemusic
+          
+          # 拉取最新代码
+          git pull origin main
+          
+          # 拉取最新镜像
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend:latest
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-ai:latest
+          
+          # 更新docker-compose配置使用新镜像
+          sed -i 's|build:|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest #build:|g' docker-compose.prod.yml
+          sed -i 's|context: .|#context: .|g' docker-compose.prod.yml
+          sed -i 's|dockerfile: Dockerfile.frontend|#dockerfile: Dockerfile.frontend|g' docker-compose.prod.yml
+          
+          # 重新部署
+          docker-compose -f docker-compose.prod.yml down
+          docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+          
+          # 清理未使用的镜像
+          docker image prune -f
+        EOF
+        
+    - name: Health Check
+      run: |
+        sleep 60
+        curl -f https://${{ secrets.DOMAIN }}/health || exit 1
+        
+    - name: Notify deployment
+      if: success()
+      run: |
+        echo "✅ Deployment successful!"
+        echo "🌐 Application: https://${{ secrets.DOMAIN }}"
+        echo "📊 Monitoring: https://monitoring.${{ secrets.DOMAIN }}"
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend:latest
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  backup:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Backup database
+      run: |
+        ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+          # 创建数据库备份
+          docker exec mantlemusic-mongodb-prod mongodump --uri="mongodb://${{ secrets.MONGO_ROOT_USERNAME }}:${{ secrets.MONGO_ROOT_PASSWORD }}@localhost:27017/mantlemusic?authSource=admin" --out=/tmp/backup-$(date +%Y%m%d-%H%M%S)
+          
+          # 上传到云存储（如果配置了）
+          if [ ! -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            aws s3 sync /tmp/backup-$(date +%Y%m%d-%H%M%S) s3://${{ secrets.BACKUP_S3_BUCKET }}/$(date +%Y%m%d-%H%M%S)/
+          fi
+        EOF

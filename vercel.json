@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "env": {
+    "NODE_ENV": "production",
+    "NEXT_PUBLIC_CHAIN_ID": "5000",
+    "NEXT_PUBLIC_RPC_URL": "https://rpc.mantle.xyz"
+  }
+}

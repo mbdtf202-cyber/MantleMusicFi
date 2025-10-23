@@ -2,14 +2,11 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Music, Github, Twitter, MessageCircle, Globe } from 'lucide-react';
+import { Music, Github } from 'lucide-react';
 
 const Footer: React.FC = () => {
   const socialLinks = [
-    { name: 'GitHub', icon: Github, href: '#' },
-    { name: 'Twitter', icon: Twitter, href: '#' },
-    { name: 'Discord', icon: MessageCircle, href: '#' },
-    { name: 'Website', icon: Globe, href: '#' },
+    { name: 'GitHub', icon: Github, href: 'https://github.com/mbdtf202-cyber/MantleMusicFi' },
   ];
 
   const footerLinks = [
@@ -35,7 +32,6 @@ const Footer: React.FC = () => {
       title: 'Community',
     links: [
       { name: 'Forum', href: '#' },
-      { name: 'Discord', href: '#' },
       { name: 'Blog', href: '#' },
       { name: 'Help Center', href: '#' },
     ],
@@ -133,7 +129,7 @@ const Footer: React.FC = () => {
           className="border-t border-mantle-border mt-12 pt-8 flex flex-col md:flex-row justify-between items-center"
         >
           <p className="text-gray-400 text-sm">
-            © 2024 MantleMusicFi. All rights reserved.
+            © 2025 MantleMusicFi. All rights reserved.
           </p>
           <p className="text-gray-400 text-sm mt-2 md:mt-0">
             Built with <span className="text-mantle-primary">❤️</span> for the decentralized music economy on <span className="text-mantle-primary font-medium">Mantle Network</span>

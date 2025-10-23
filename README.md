@@ -778,10 +778,7 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 - **🐙 GitHub**: [https://github.com/mbdtf202-cyber/MantleMusicFi](https://github.com/mbdtf202-cyber/MantleMusicFi)
 
 #### **社区与支持**
-- **💬 Discord**: [https://discord.gg/mantlemusicfi](https://discord.gg/mantlemusicfi)
-- **🐦 Twitter**: [@MantleMusicFi](https://twitter.com/MantleMusicFi)
-- **📱 Telegram**: [@MantleMusicFi](https://t.me/MantleMusicFi)
-- **📧 邮箱**: contact@mantlemusicfi.com
+- **📧 邮箱**: mbdtf202@gmail.com
 
 #### **技术资源**
 - **🔗 Mantle Network**: [https://mantle.xyz](https://mantle.xyz)
@@ -801,8 +798,7 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 ### 📞 联系我们
 
-- **📧 邮箱**: contact@mantlemusicfi.com
-- **💬 Telegram**: [@MantleMusicFi](https://t.me/MantleMusicFi)
+- **📧 邮箱**: mbdtf202@gmail.com
 - **🐛 问题反馈**: [GitHub Issues](https://github.com/mbdtf202-cyber/MantleMusicFi/issues)
 - **💡 功能建议**: [GitHub Discussions](https://github.com/mbdtf202-cyber/MantleMusicFi/discussions)
 
@@ -815,6 +811,5 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 **🎵 Revolutionizing Music Industry with Blockchain Technology 🎵**
 
 [![Star on GitHub](https://img.shields.io/github/stars/mbdtf202-cyber/MantleMusicFi?style=social)](https://github.com/mbdtf202-cyber/MantleMusicFi)
-[![Follow on Twitter](https://img.shields.io/twitter/follow/MantleMusicFi?style=social)](https://twitter.com/MantleMusicFi)
 
 </div>

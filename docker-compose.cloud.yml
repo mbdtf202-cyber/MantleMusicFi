@@ -1,0 +1,244 @@
+version: '3.8'
+
+# 云端部署覆盖配置
+# 使用方法: docker-compose -f docker-compose.prod.yml -f docker-compose.cloud.yml up -d
+
+services:
+  # 前端服务 - 云端配置
+  frontend:
+    image: ghcr.io/mbdtf202-cyber/mantlemusicfi-frontend:latest
+    build: null  # 覆盖构建配置，使用预构建镜像
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${BACKEND_URL}
+      - NEXT_PUBLIC_AI_SERVICE_URL=${AI_SERVICE_URL}
+      - NEXT_PUBLIC_MANTLE_RPC_URL=${MANTLE_RPC_URL}
+      - NEXT_PUBLIC_CHAIN_ID=${CHAIN_ID}
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # 后端服务 - 云端配置
+  backend:
+    image: ghcr.io/mbdtf202-cyber/mantlemusicfi-backend:latest
+    build: null  # 覆盖构建配置，使用预构建镜像
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.75'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=${MONGODB_URI}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN}
+      - AI_SERVICE_URL=http://ai-service:8000
+      - MANTLE_RPC_URL=${MANTLE_RPC_URL}
+      - PRIVATE_KEY=${PRIVATE_KEY}
+      - CONTRACT_ADDRESS=${CONTRACT_ADDRESS}
+
+  # AI服务 - 云端配置
+  ai-service:
+    image: ghcr.io/mbdtf202-cyber/mantlemusicfi-ai:latest
+    build: null  # 覆盖构建配置，使用预构建镜像
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 15s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+
+  # MongoDB - 云端配置
+  mongodb:
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+      - ./backups:/backups  # 备份目录
+
+  # Redis - 云端配置
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+
+  # Nginx - 云端负载均衡配置
+  nginx:
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+      - ./nginx/cache:/var/cache/nginx
+
+  # 添加日志聚合服务
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: mantlemusic-logstash
+    volumes:
+      - ./monitoring/logstash/config:/usr/share/logstash/config:ro
+      - ./monitoring/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - nginx_logs:/var/log/nginx:ro
+    environment:
+      - "LS_JAVA_OPTS=-Xmx512m -Xms512m"
+    networks:
+      - mantlemusic-network
+    depends_on:
+      - elasticsearch
+
+  # Elasticsearch for log storage
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: mantlemusic-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - mantlemusic-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+
+  # Kibana for log visualization
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: mantlemusic-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - mantlemusic-network
+    depends_on:
+      - elasticsearch
+
+  # 添加备份服务
+  backup:
+    image: alpine:latest
+    container_name: mantlemusic-backup
+    volumes:
+      - mongodb_data:/data/mongodb:ro
+      - redis_data:/data/redis:ro
+      - ./backups:/backups
+      - ./scripts:/scripts:ro
+    environment:
+      - MONGO_ROOT_USERNAME=${MONGO_ROOT_USERNAME}
+      - MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - S3_BUCKET_NAME=${BACKUP_S3_BUCKET}
+    command: |
+      sh -c "
+        apk add --no-cache mongodb-tools aws-cli dcron
+        echo '${BACKUP_SCHEDULE} /scripts/backup.sh' | crontab -
+        crond -f
+      "
+    networks:
+      - mantlemusic-network
+    depends_on:
+      - mongodb
+      - redis
+
+volumes:
+  mongodb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/mantlemusic/data/mongodb
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/mantlemusic/data/redis
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  nginx_logs:
+    driver: local
+
+networks:
+  mantlemusic-network:
+    driver: overlay
+    attachable: true
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

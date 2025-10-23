@@ -268,7 +268,6 @@ const PortfolioOverview: React.FC<{ userId: string }> = ({ userId }) => {
               data={performanceHistory}
               color="#00D4AA"
               showGrid={true}
-              showTooltip={true}
             />
           </div>
         </Card>
@@ -279,7 +278,6 @@ const PortfolioOverview: React.FC<{ userId: string }> = ({ userId }) => {
             <CustomPieChart
               data={allocationData}
               showLegend={true}
-              showTooltip={true}
             />
           </div>
         </Card>

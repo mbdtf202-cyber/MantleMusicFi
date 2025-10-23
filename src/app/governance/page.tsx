@@ -33,7 +33,7 @@ interface Proposal {
   title: string;
   description: string;
   proposer: string;
-  status: 'active' | 'passed' | 'rejected' | 'pending';
+  status: 'active' | 'passed' | 'rejected' | 'pending' | 'executed' | 'cancelled';
   votesFor: number;
   votesAgainst: number;
   totalVotes: number;
